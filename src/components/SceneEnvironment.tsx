@@ -163,7 +163,7 @@ export function SceneEnvironment({ mode }: { mode: SceneMode }) {
     : galaxyMode
       ? ['#03040b', 6600, 13600]
     : mode === 'system'
-      ? ['#03040b', 45, 115]
+      ? ['#03040b', 220, 620]
       : ['#03040b', 420, 1300]
 
   return (

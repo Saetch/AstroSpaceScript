@@ -264,7 +264,7 @@ export default function App() {
           <OrbitControls
             makeDefault
             enablePan={view.type !== 'planet'}
-            minDistance={view.type === 'planet' ? 5.5 : 12}
+            minDistance={view.type === 'planet' ? 0.7 : 0.85}
             maxDistance={view.type === 'system' ? 170 : 15}
             minPolarAngle={0.22}
             maxPolarAngle={Math.PI - 0.22}

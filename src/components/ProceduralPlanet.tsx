@@ -385,8 +385,8 @@ function evaluateSurfaceShape(planet: Planet, archetype: PlanetArchetype, seed: 
 
 function isUrbanizable(archetype: PlanetArchetype, shape: SurfaceShape) {
   if (archetype === 'gas-giant' || archetype === 'ice-giant' || archetype === 'icy') return false
-  if (shape.isOcean || shape.mountainFactor > 0.48 || shape.lavaFactor > 0.18 || shape.iceFactor > 0.22) return false
-  return true
+  return !(shape.isOcean || shape.mountainFactor > 0.48 || shape.lavaFactor > 0.18 || shape.iceFactor > 0.22);
+
 }
 
 function buildUrbanClusters(planet: Planet, archetype: PlanetArchetype, seed: number) {
@@ -514,7 +514,10 @@ export function buildUrbanLightSites(planet: Planet, seedKey: string, baseRadius
 function createPlanetMaps(planet: Planet, seedKey: string, detail: DetailLevel): PlanetMaps {
   const seed = seedForPlanet(planet, seedKey)
   const archetype = describePlanetArchetype(planet)
-  const size = detail === 'detail' ? 1024 : 512
+  // Use the same procedural recipe in both views. The system view keeps a
+  // smaller texture for performance, but is high enough that coastlines, ice,
+  // gas bands, cities, and lava fields retain the same visual identity.
+  const size = detail === 'detail' ? 1024 : 640
   const colorCanvas = buildCanvas(size)
   const bumpCanvas = buildCanvas(size)
   const roughnessCanvas = buildCanvas(size)
@@ -697,8 +700,10 @@ function createPlanetMaps(planet: Planet, seedKey: string, detail: DetailLevel):
     alphaCloudMap: makeTexture(cloudCanvas),
     atmosphereColor: archetype === 'gas-giant' ? undefined : atmosphereColor,
     cloudOpacity,
-    displacementScale: detail === 'detail' && archetype !== 'gas-giant' && archetype !== 'ice-giant' ? planet.radius * 0.22 : 0,
-    bumpScale: detail === 'detail' ? planet.radius * 0.12 : planet.radius * 0.045,
+    displacementScale: archetype !== 'gas-giant' && archetype !== 'ice-giant'
+      ? planet.radius * (detail === 'detail' ? 0.22 : 0.035)
+      : 0,
+    bumpScale: detail === 'detail' ? planet.radius * 0.12 : planet.radius * 0.08,
   }
 }
 
@@ -710,7 +715,7 @@ export function ProceduralPlanet({ planet, seedKey, detail = 'system', radius, o
   onClick?: (event: ThreeEvent<MouseEvent>) => void
 }) {
   const maps = useMemo(() => createPlanetMaps(planet, seedKey, detail), [detail, planet, seedKey])
-  const segmentCount = detail === 'detail' ? 164 : 72
+  const segmentCount = detail === 'detail' ? 164 : 96
 
   return (
     <group>
@@ -720,7 +725,7 @@ export function ProceduralPlanet({ planet, seedKey, detail = 'system', radius, o
           map={maps.colorMap}
           bumpMap={maps.bumpMap}
           bumpScale={maps.bumpScale}
-          displacementMap={detail === 'detail' ? maps.bumpMap : undefined}
+          displacementMap={maps.displacementScale > 0 ? maps.bumpMap : undefined}
           displacementScale={maps.displacementScale}
           roughnessMap={maps.roughnessMap}
           roughness={0.95}
@@ -728,6 +733,7 @@ export function ProceduralPlanet({ planet, seedKey, detail = 'system', radius, o
           emissiveMap={maps.emissiveMap}
           emissive="#ffffff"
           emissiveIntensity={1.12}
+          fog={detail === 'detail'}
         />
       </mesh>
 
@@ -741,6 +747,7 @@ export function ProceduralPlanet({ planet, seedKey, detail = 'system', radius, o
             color="#ffffff"
             depthWrite={false}
             roughness={0.92}
+            fog={detail === 'detail'}
           />
         </mesh>
       )}
@@ -748,25 +755,48 @@ export function ProceduralPlanet({ planet, seedKey, detail = 'system', radius, o
       {maps.atmosphereColor && planet.atmosphere.toLowerCase() !== 'none' && (
         <mesh>
           <sphereGeometry args={[radius * 1.055, 64, 64]} />
-          <meshBasicMaterial color={maps.atmosphereColor} transparent opacity={detail === 'detail' ? 0.16 : 0.08} side={THREE.BackSide} />
+          <meshBasicMaterial
+            color={maps.atmosphereColor}
+            transparent
+            opacity={detail === 'detail' ? 0.16 : 0.13}
+            side={THREE.BackSide}
+            fog={detail === 'detail'}
+          />
         </mesh>
       )}
     </group>
   )
 }
 
-export function PlanetRings({ planet, radius }: { planet: Planet; radius: number }) {
+export function PlanetRings({ planet, radius, detail = 'detail' }: { planet: Planet; radius: number; detail?: DetailLevel }) {
   if (!planet.ringColor) return null
 
   return (
     <group>
       <mesh rotation={[Math.PI / 2, 0, 0]}>
         <ringGeometry args={[radius * 1.48, radius * 2.38, 192]} />
-        <meshStandardMaterial color={planet.ringColor} transparent opacity={0.5} roughness={0.86} metalness={0.04} side={THREE.DoubleSide} depthWrite={false} />
+        <meshStandardMaterial
+          color={planet.ringColor}
+          transparent
+          opacity={0.5}
+          roughness={0.86}
+          metalness={0.04}
+          side={THREE.DoubleSide}
+          depthWrite={false}
+          fog={detail === 'detail'}
+        />
       </mesh>
       <mesh rotation={[Math.PI / 2, 0, 0]}>
         <ringGeometry args={[radius * 1.78, radius * 1.9, 192]} />
-        <meshBasicMaterial color="#ffffff" transparent opacity={0.11} side={THREE.DoubleSide} depthWrite={false} toneMapped={false} />
+        <meshBasicMaterial
+          color="#ffffff"
+          transparent
+          opacity={0.11}
+          side={THREE.DoubleSide}
+          depthWrite={false}
+          toneMapped={false}
+          fog={detail === 'detail'}
+        />
       </mesh>
     </group>
   )

@@ -124,6 +124,8 @@ export interface Moon {
   orbitRadius: number
   orbitSpeed: number
   orbitOffset: number
+  /** Orbital-plane inclination in degrees, supplied by the backend. */
+  orbitInclination?: number
   color: string
   secondaryColor?: string
   colonized?: boolean
@@ -139,6 +141,8 @@ export interface Planet {
   orbitRadius: number
   orbitSpeed: number
   orbitOffset: number
+  /** Orbital-plane inclination in degrees, supplied by the backend. */
+  orbitInclination?: number
   orbitIndex?: number
   color: string
   secondaryColor: string

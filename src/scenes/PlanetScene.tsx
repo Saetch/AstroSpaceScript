@@ -13,6 +13,7 @@ import {
 import { hashSeed } from '../procedural/planetSeed'
 import { yawForSubstellarMeshAxis } from '../procedural/tidalOrientation'
 import { MoonSystem } from '../components/MoonSystem'
+import { MoonFocusController, type MoonFocusTarget } from '../components/MoonFocusController'
 import { getSystemPrimaryColor, getSystemPrimaryRadius, SystemPrimaryVisual } from '../components/SystemPrimary'
 
 function seededRandom(seed: number) {
@@ -658,6 +659,7 @@ export function PlanetScene({
   onSelectPoint: (point?: SurfacePoint) => void
 }) {
   const spinGroup = useRef<THREE.Group>(null)
+  const [focusedMoon, setFocusedMoon] = useState<MoonFocusTarget>()
   const tidallyLocked = planet.tidallyLocked ?? planet.type.toLowerCase().includes('tidally locked')
   const inspectionPrimaryLayout = useMemo(() => getInspectionPrimaryLayout(system, planet), [planet, system])
   const lockedInspectionYaw = useMemo(() => {
@@ -691,6 +693,7 @@ export function PlanetScene({
           <group
             onClick={(event) => {
               event.stopPropagation()
+              setFocusedMoon(undefined)
               onSelectPoint(undefined)
             }}
           >
@@ -739,7 +742,18 @@ export function PlanetScene({
         </group>
         <PlanetRings planet={planet} radius={radius} />
       </group>
-      <MoonSystem moons={planet.moons} parentRadius={radius} mode="inspection" />
+      <MoonSystem
+        moons={planet.moons}
+        parentRadius={radius}
+        mode="inspection"
+        focusedMoonId={focusedMoon?.id}
+        onFocusMoon={setFocusedMoon}
+      />
+      <MoonFocusController
+        focus={focusedMoon}
+        onClear={() => setFocusedMoon(undefined)}
+        distanceMultiplier={8}
+      />
       <directionalLight position={inspectionPrimaryLayout.position.toArray()} intensity={5.1} color={getSystemPrimaryColor(system)} />
       <pointLight position={[-5, -2, -4]} intensity={1.7} color="#4d79ff" />
     </group>

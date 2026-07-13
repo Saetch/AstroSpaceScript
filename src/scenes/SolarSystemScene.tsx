@@ -8,18 +8,45 @@ import { PlanetRings, ProceduralPlanet } from '../components/ProceduralPlanet'
 import { buildPlanetSeedKey } from '../procedural/planetSeed'
 import { yawForSubstellarMeshAxis } from '../procedural/tidalOrientation'
 import { MoonSystem } from '../components/MoonSystem'
+import { MoonFocusController, type MoonFocusTarget } from '../components/MoonFocusController'
 import { SystemPrimaryVisual } from '../components/SystemPrimary'
 
 const ORBIT_SCALE = 2.35
 const ORBIT_ANIMATION_SCALE = 0.28
 
+function SystemSurveyLighting() {
+  const cameraFill = useRef<THREE.PointLight>(null)
+
+  useFrame(({ camera }) => {
+    cameraFill.current?.position.copy(camera.position)
+  })
+
+  return (
+    <>
+      <ambientLight intensity={0.5} />
+      <hemisphereLight color="#e7efff" groundColor="#172038" intensity={0.72} />
+      <pointLight
+        ref={cameraFill}
+        color="#dbe8ff"
+        intensity={1.75}
+        distance={0}
+        decay={0}
+      />
+    </>
+  )
+}
+
 function OrbitingPlanet({
   planet,
   seedKey,
+  focusedMoonId,
+  onFocusMoon,
   onOpen,
 }: {
   planet: Planet
   seedKey: string
+  focusedMoonId?: string
+  onFocusMoon: (target: MoonFocusTarget) => void
   onOpen: () => void
 }) {
   const positionGroup = useRef<THREE.Group>(null)
@@ -91,9 +118,15 @@ function OrbitingPlanet({
         >
           <ProceduralPlanet planet={planet} seedKey={seedKey} radius={planet.radius} detail="system" />
         </group>
-        <PlanetRings planet={planet} radius={planet.radius} />
+        <PlanetRings planet={planet} radius={planet.radius} detail="system" />
       </group>
-      <MoonSystem moons={planet.moons} parentRadius={planet.radius} mode="system" />
+      <MoonSystem
+        moons={planet.moons}
+        parentRadius={planet.radius}
+        mode="system"
+        focusedMoonId={focusedMoonId}
+        onFocusMoon={onFocusMoon}
+      />
 
       <Html center distanceFactor={10} position={[0, planet.radius + 0.7, 0]} style={{ pointerEvents: 'none' }}>
         <div className={`world-label ${hovered ? 'world-label--active' : ''}`}>
@@ -106,22 +139,34 @@ function OrbitingPlanet({
 }
 
 export function SolarSystemScene({ system, onOpenPlanet }: { system: StarSystem; onOpenPlanet: (id: string) => void }) {
+  const [focusedMoon, setFocusedMoon] = useState<MoonFocusTarget>()
+
   return (
-    <group rotation={[0.16, -0.15, 0]}>
-      <ambientLight intensity={0.34} />
-      <hemisphereLight color="#dce8ff" groundColor="#0a1020" intensity={0.58} />
+    <>
+      <SystemSurveyLighting />
+      <group rotation={[0.16, -0.15, 0]}>
       <SystemPrimaryVisual system={system} />
-      {system.planets.map((planet) => (
-        <OrbitRing key={`orbit-${planet.id}`} radius={planet.orbitRadius * ORBIT_SCALE} />
-      ))}
       {system.planets.map((planet, planetIndex) => (
-        <OrbitingPlanet
+        <group
           key={planet.id}
-          planet={planet}
-          seedKey={buildPlanetSeedKey(system.position, planet.orbitIndex ?? planetIndex)}
-          onOpen={() => onOpenPlanet(planet.id)}
-        />
+          rotation={[0, 0, THREE.MathUtils.degToRad(planet.orbitInclination ?? 0)]}
+        >
+          <OrbitRing radius={planet.orbitRadius * ORBIT_SCALE} />
+          <OrbitingPlanet
+            planet={planet}
+            seedKey={buildPlanetSeedKey(system.position, planet.orbitIndex ?? planetIndex)}
+            focusedMoonId={focusedMoon?.id}
+            onFocusMoon={setFocusedMoon}
+            onOpen={() => onOpenPlanet(planet.id)}
+          />
+        </group>
       ))}
-    </group>
+        <MoonFocusController
+          focus={focusedMoon}
+          onClear={() => setFocusedMoon(undefined)}
+          distanceMultiplier={9.5}
+        />
+      </group>
+    </>
   )
 }

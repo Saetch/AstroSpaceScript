@@ -500,3 +500,34 @@ Each rendered lane uses its own load for dash spacing, brightness, packet count,
 ## Traffic visibility correction
 
 Traffic routes are represented by GPU-batched point sprites rather than a continuous screen-space line. The markers have a fixed 14-unit world-space separation along each lane and a fixed pixel size on screen, so they remain visible from the default galaxy camera. Directional volume controls how many consecutive marker slots are occupied; the occupied group loops continuously along the route.
+
+## Orbital inclination and moon focus
+
+Planet and moon orbit planes now accept backend-owned inclination values in degrees:
+
+```ts
+interface Planet {
+  orbitInclination?: number
+}
+
+interface Moon {
+  orbitInclination?: number
+}
+```
+
+The mock repository assigns deterministic values from approximately -5 to +10 degrees. The system scene applies a planet's inclination to both its orbit ring and orbital position. Moon inclination is applied locally relative to the parent planet's orbit plane.
+
+Moons are clickable in both the solar-system and planet-inspection scenes. Selection moves the existing camera and OrbitControls target to the moon without changing routes, remounting the Canvas, or showing a loading transition. The camera continues following the moon's orbital translation while still allowing local orbit and zoom controls. The on-screen `Return to overview` action eases the camera back to the scene's initial camera and target.
+
+System-view planets now use a higher-resolution procedural texture, denser sphere geometry, visible terrain displacement, stronger bump detail, and atmosphere opacity closer to the inspection view. Both views still use the same seed and surface-generation algorithm; the remaining quality difference is a deliberate performance tradeoff.
+
+## Always-visible planets in system view
+
+The system overview uses presentation-only survey lighting so distant planets remain readable regardless of their orbital position:
+
+- planet, cloud, atmosphere, and ring materials ignore system-view fog
+- system fog begins beyond the playable orbital layout
+- a soft camera-relative fill light illuminates the camera-facing hemisphere
+- the system primary still supplies the dominant color and day/night direction
+
+Planet inspection retains the normal close-up fog and physically directional shading.

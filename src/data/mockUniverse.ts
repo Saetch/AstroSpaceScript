@@ -1,6 +1,16 @@
 import type { Galaxy, Moon, StarSystem, TrafficRoute } from '../domain/universe'
 
 
+function mockOrbitInclination(id: string) {
+  let hash = 2166136261
+  for (let index = 0; index < id.length; index += 1) {
+    hash ^= id.charCodeAt(index)
+    hash = Math.imul(hash, 16777619)
+  }
+  const normalized = (hash >>> 0) / 4294967295
+  return Number((-5 + normalized * 15).toFixed(1))
+}
+
 function mockMoon(
   id: string,
   name: string,
@@ -12,7 +22,18 @@ function mockMoon(
   color: string,
   secondaryColor?: string,
 ): Moon {
-  return { id, name, type, radius, orbitRadius, orbitSpeed, orbitOffset, color, secondaryColor }
+  return {
+    id,
+    name,
+    type,
+    radius,
+    orbitRadius,
+    orbitSpeed,
+    orbitOffset,
+    orbitInclination: mockOrbitInclination(`moon:${id}`),
+    color,
+    secondaryColor,
+  }
 }
 
 export const mockGalaxies: Galaxy[] = [
@@ -81,7 +102,7 @@ export const mockGalaxies: Galaxy[] = [
   },
 ]
 
-export const mockSystems: StarSystem[] = [
+const mockSystemDefinitions: StarSystem[] = [
   {
     id: 'sol',
     galaxyId: 'perseus-ledger',
@@ -892,6 +913,19 @@ export const mockSystems: StarSystem[] = [
   },
 
 ]
+
+
+export const mockSystems: StarSystem[] = mockSystemDefinitions.map((system) => ({
+  ...system,
+  planets: system.planets.map((planet) => ({
+    ...planet,
+    orbitInclination: planet.orbitInclination ?? mockOrbitInclination(`planet:${system.id}:${planet.id}`),
+    moons: planet.moons?.map((moon) => ({
+      ...moon,
+      orbitInclination: moon.orbitInclination ?? mockOrbitInclination(`moon:${system.id}:${planet.id}:${moon.id}`),
+    })),
+  })),
+}))
 
 
 /** Backend-shaped traffic records used by the mock repository. */

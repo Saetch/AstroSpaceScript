@@ -842,3 +842,53 @@ button.galaxy-overview-label:focus-visible {
   font-size: 10px;
   line-height: 1.45;
 }
+
+.moon-label--focused {
+  border-color: rgba(202, 244, 255, 0.78);
+  box-shadow: 0 0 22px rgba(115, 218, 255, 0.22);
+}
+
+.moon-focus-hud {
+  position: absolute;
+  left: 50%;
+  bottom: 30px;
+  transform: translateX(-50%);
+  display: grid;
+  grid-template-columns: auto auto auto;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px 10px 14px;
+  border: 1px solid rgba(148, 207, 230, 0.34);
+  border-radius: 999px;
+  background: rgba(6, 11, 23, 0.82);
+  box-shadow: 0 14px 42px rgba(0, 0, 0, 0.35), inset 0 1px rgba(255,255,255,0.05);
+  backdrop-filter: blur(14px);
+  color: #edf8ff;
+  pointer-events: none;
+}
+
+.moon-focus-hud > span {
+  color: #7fe1ff;
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+}
+
+.moon-focus-hud > strong {
+  font: 600 12px Space Grotesk, sans-serif;
+}
+
+.moon-focus-hud button {
+  border: 1px solid rgba(141, 199, 221, 0.28);
+  border-radius: 999px;
+  background: rgba(29, 55, 72, 0.7);
+  color: #dff6ff;
+  padding: 7px 10px;
+  font-size: 9px;
+  cursor: pointer;
+}
+
+.moon-focus-hud button:hover {
+  border-color: rgba(147, 229, 255, 0.62);
+  background: rgba(43, 81, 103, 0.82);
+}
