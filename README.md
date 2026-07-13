@@ -531,3 +531,69 @@ The system overview uses presentation-only survey lighting so distant planets re
 - the system primary still supplies the dominant color and day/night direction
 
 Planet inspection retains the normal close-up fog and physically directional shading.
+
+## Selectable supermassive galactic core
+
+The mock Perseus Ledger now includes a backend-shaped galactic-core system record named **The Sovereign Dark**. It uses the same `StarSystem` and `BlackHoleConfig` records as other compact-object systems, with one extra map role:
+
+```ts
+interface StarSystem {
+  mapRole?: 'standard' | 'galactic-core'
+  primaryKind?: 'star' | 'black-hole'
+  blackHole?: BlackHoleConfig
+}
+```
+
+A `galactic-core` record is positioned at the center of the selected galaxy map, rendered at a much larger presentation scale, and remains selectable like a normal system. Clicking it opens the existing system inspection view. Its event horizon, accretion disc, photon ring, jets, mass, spin, and colors are all supplied by the repository snapshot; the frontend only animates and presents those values.
+
+## Galactic core presentation
+
+The galactic-core black hole uses the same backend `BlackHoleConfig` as its system inspection view. On the galaxy map, the frontend applies a compact presentation scale so its visible accretion disc is no more than roughly three ordinary system-beacon radii. The mock accretion flow uses `rotationSpeed: 1.7`, making the disc substantially faster and more active than before.
+
+## Black-hole lensing pipeline
+
+Selected black-hole systems use `BlackHoleLensingPass`:
+
+1. Render the scene to an offscreen framebuffer with black-hole foreground objects hidden.
+2. Draw a camera-facing lens surface that samples the captured scene.
+3. Deflect the captured background using a thin-lens point-mass approximation.
+4. Render the event horizon, accretion disc, photon ring, and jets normally in front.
+
+Backend presentation fields:
+
+```ts
+blackHole: {
+  lensingStrength?: number
+  lensingRadiusMultiplier?: number
+}
+```
+
+This is real screen-space scene warping, not transparent halo geometry. It is still an approximation rather than numerical Kerr geodesic integration.
+
+## Black-hole lensing revision
+
+The selected black-hole system uses a captured-scene thin-lens pass. The offscreen capture includes the accretion disc and surrounding scene but excludes the event horizon and jets. A camera-facing lens surface warps that capture, after which the event horizon is drawn on top. Decorative halo and photon-ring geometry have been removed. The compact galactic-core marker is static relative to the galaxy and does not animate its disc texture.
+
+Map-level lensing is intentionally disabled: at the compact marker scale it is visually ambiguous and would require a second scene render every frame on the already large galaxy map.
+
+## Lensing pipeline correction
+
+The accretion disc is now rendered only into the offscreen capture used by the lens shader. The original disc geometry is hidden for the final scene render, preventing a duplicate unwarped disc from appearing underneath the lensed version. The mock galactic-core lensing radius multiplier is also increased so distortion extends farther beyond the accretion disc.
+
+## Latest rendering corrections
+
+- Black-hole accretion discs now use one physical ring mesh before the lensing capture. The previous two-layer disc geometry made both black holes look like they had duplicated discs after lensing.
+- Galaxy and planet views use brighter camera-centered starfields with slightly larger point sizes and stronger secondary stars. Universe-overview and system-view starfield settings remain unchanged.
+
+## Lensing pipeline correction
+
+The black-hole pass now uses two render targets:
+
+- a color capture containing the background and accretion disc
+- a second depth capture excluding all black-hole geometry
+
+The final lens shader renders only the warped capture rather than blending the original disc into it. It discards lens pixels wherever an ordinary scene body is closer to the camera than the black hole, so foreground planets and moons remain unwarped and also occlude the event horizon normally.
+
+## Lensing compositing correction
+
+The system-view lens pass now tags planets and moons as `blackHoleLensingBody` objects. Bodies closer to the camera than the black hole are omitted from the offscreen lens capture and restored for the final depth-tested render. The shader uses the primary point-mass image only, avoiding the mirrored secondary branch that previously made the accretion disc appear twice.

@@ -5,7 +5,7 @@ import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib'
 import * as THREE from 'three'
 import type { Galaxy, StarSystem, TrafficRoute } from '../domain/universe'
 import { buildGalaxyInteractionStreams, buildGalaxyPointGeometry, galaxyGroupExtent, getGalaxyBodies } from '../procedural/galaxyGeometry'
-import { getSystemPrimaryColor, getSystemPrimaryRadius, isBlackHoleSystem } from '../components/SystemPrimary'
+import { getSystemPrimaryColor, getSystemPrimaryRadius, isBlackHoleSystem, isGalacticCoreSystem, SystemPrimaryVisual } from '../components/SystemPrimary'
 import { GalaxyTrafficRoutes } from '../components/GalaxyTrafficRoutes'
 
 const GALAXY_WORLD_SCALE = 4
@@ -559,6 +559,56 @@ function SystemBeacon({ system, position, hovered, labelsVisible, onHover, onOpe
   )
 }
 
+function GalacticCoreMarker({ system, labelsVisible, onOpen }: {
+  system: StarSystem
+  labelsVisible: boolean
+  onOpen: () => void
+}) {
+  const root = useRef<THREE.Group>(null)
+  const entry = useRef(0)
+  const [hovered, setHovered] = useState(false)
+  useCursor(hovered)
+
+  useFrame((_, delta) => {
+    entry.current = THREE.MathUtils.damp(entry.current, 1, 3.1, delta)
+    if (root.current) {
+      const hoverScale = hovered ? 1.075 : 1
+      root.current.scale.setScalar(Math.max(0.02, entry.current) * hoverScale)
+    }
+  })
+
+  return (
+    <group
+      position={[0, 5, 0]}
+      onPointerOver={(event) => {
+        event.stopPropagation()
+        setHovered(true)
+      }}
+      onPointerOut={() => setHovered(false)}
+      onClick={(event) => {
+        event.stopPropagation()
+        onOpen()
+      }}
+    >
+      <group ref={root} scale={0.02}>
+        <SystemPrimaryVisual system={system} scale={0.72} detail="system" animationScale={0} />
+
+        <mesh scale={[18, 7, 18]} renderOrder={25}>
+          <sphereGeometry args={[1, 24, 16]} />
+          <meshBasicMaterial transparent opacity={0} depthWrite={false} depthTest={false} />
+        </mesh>
+      </group>
+
+      <Html center position={[0, 24, 0]} style={{ pointerEvents: 'none' }}>
+        <div className={`world-label galactic-core-label ${hovered ? 'world-label--active' : ''}`}>
+          <strong>{system.name}</strong>
+          <span>{labelsVisible || hovered ? `GALACTIC CORE · ${system.blackHole?.massSolar.toLocaleString('en') ?? 'SUPERMASSIVE'} M☉ · click to inspect` : 'GALACTIC CORE · click to inspect'}</span>
+        </div>
+      </Html>
+    </group>
+  )
+}
+
 function ChartedRegion({ center, labelsVisible }: { center: THREE.Vector3; labelsVisible: boolean }) {
   if (labelsVisible) return null
 
@@ -587,9 +637,11 @@ export function GalaxyScene({ galaxy, systems, trafficRoutes, followRotation, re
   const labelsVisibleRef = useRef(false)
   const { camera, controls } = useThree()
   useCursor(hoveredIndex !== undefined)
-  const positions = useMemo(() => projectSystemPositions(systems), [systems])
+  const coreSystems = useMemo(() => systems.filter(isGalacticCoreSystem), [systems])
+  const navigableSystems = useMemo(() => systems.filter((system) => !isGalacticCoreSystem(system)), [systems])
+  const positions = useMemo(() => projectSystemPositions(navigableSystems), [navigableSystems])
   const regionCenter = useMemo(() => chartedRegionCenter(), [])
-  const territoryGroups = useMemo(() => buildTerritoryGroups(systems, positions), [positions, systems])
+  const territoryGroups = useMemo(() => buildTerritoryGroups(navigableSystems, positions), [navigableSystems, positions])
 
   useEffect(() => {
     if (rotationRoot.current) rotationRoot.current.rotation.set(0, 0, 0)
@@ -628,7 +680,7 @@ export function GalaxyScene({ galaxy, systems, trafficRoutes, followRotation, re
 
     const rootRotation = rotationRoot.current?.rotation.y ?? 0
     const worldRegionCenter = regionCenter.clone().applyEuler(GALAXY_TILT).applyAxisAngle(Y_AXIS, rootRotation)
-    const shouldShowLabels = systems.length > 0 && camera.position.distanceTo(worldRegionCenter) < LABEL_VISIBILITY_DISTANCE
+    const shouldShowLabels = navigableSystems.length > 0 && camera.position.distanceTo(worldRegionCenter) < LABEL_VISIBILITY_DISTANCE
     if (shouldShowLabels !== labelsVisibleRef.current) {
       labelsVisibleRef.current = shouldShowLabels
       setLabelsVisible(shouldShowLabels)
@@ -641,10 +693,18 @@ export function GalaxyScene({ galaxy, systems, trafficRoutes, followRotation, re
         <MassiveGalaxy galaxy={galaxy} territoryGroups={territoryGroups} />
         <MergedTerritoryMap territoryGroups={territoryGroups} />
         <pointLight position={[0, 8, 0]} color={galaxy.primaryColor} intensity={220} distance={220} />
-        {systems.length > 0 && <ChartedRegion center={regionCenter} labelsVisible={labelsVisible} />}
-        <GalaxyTrafficRoutes routes={trafficRoutes} systems={systems} positions={positions} detailVisible={labelsVisible} />
-        <SystemInstances systems={systems} positions={positions} onOpenSystem={onOpenSystem} onHover={setHoveredIndex} />
-        {systems.map((system, index) => (
+        {navigableSystems.length > 0 && <ChartedRegion center={regionCenter} labelsVisible={labelsVisible} />}
+        {coreSystems.map((coreSystem) => (
+          <GalacticCoreMarker
+            key={coreSystem.id}
+            system={coreSystem}
+            labelsVisible={labelsVisible}
+            onOpen={() => onOpenSystem(coreSystem.id)}
+          />
+        ))}
+        <GalaxyTrafficRoutes routes={trafficRoutes} systems={navigableSystems} positions={positions} detailVisible={labelsVisible} />
+        <SystemInstances systems={navigableSystems} positions={positions} onOpenSystem={onOpenSystem} onHover={setHoveredIndex} />
+        {navigableSystems.map((system, index) => (
           <SystemBeacon key={system.id} system={system} position={positions[index]} hovered={hoveredIndex === index}
             labelsVisible={labelsVisible} onHover={(hovered) => setHoveredIndex(hovered ? index : undefined)}
             onOpen={() => onOpenSystem(system.id)} />

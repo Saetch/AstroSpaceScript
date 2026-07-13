@@ -385,8 +385,8 @@ function evaluateSurfaceShape(planet: Planet, archetype: PlanetArchetype, seed: 
 
 function isUrbanizable(archetype: PlanetArchetype, shape: SurfaceShape) {
   if (archetype === 'gas-giant' || archetype === 'ice-giant' || archetype === 'icy') return false
-  return !(shape.isOcean || shape.mountainFactor > 0.48 || shape.lavaFactor > 0.18 || shape.iceFactor > 0.22);
-
+  if (shape.isOcean || shape.mountainFactor > 0.48 || shape.lavaFactor > 0.18 || shape.iceFactor > 0.22) return false
+  return true
 }
 
 function buildUrbanClusters(planet: Planet, archetype: PlanetArchetype, seed: number) {

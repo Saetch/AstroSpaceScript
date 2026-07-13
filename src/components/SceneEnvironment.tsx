@@ -20,10 +20,15 @@ function starfieldSettings(mode: SceneMode) {
     return {
       radius: 9800,
       count: 9200,
-      size: 1.45,
+      size: 1.65,
       secondaryCount: 2200,
       secondaryRadius: 6200,
-      secondarySize: 1.9,
+      secondarySize: 2.15,
+      primaryOpacity: 0.94,
+      secondaryOpacity: 0.58,
+      brightnessBase: 0.68,
+      brightnessRange: 0.42,
+      brightnessPower: 3.4,
     }
   }
 
@@ -35,31 +40,46 @@ function starfieldSettings(mode: SceneMode) {
       secondaryCount: 1600,
       secondaryRadius: 1320,
       secondarySize: 1.8,
+      primaryOpacity: 0.82,
+      secondaryOpacity: 0.42,
+      brightnessBase: 0.56,
+      brightnessRange: 0.44,
+      brightnessPower: 4,
     }
   }
 
   if (mode === 'planet') {
     return {
       radius: 1050,
-      count: 5000,
-      size: 1.25,
-      secondaryCount: 900,
+      count: 6800,
+      size: 1.82,
+      secondaryCount: 1500,
       secondaryRadius: 620,
-      secondarySize: 1.65,
+      secondarySize: 2.4,
+      primaryOpacity: 1.0,
+      secondaryOpacity: 0.82,
+      brightnessBase: 0.92,
+      brightnessRange: 0.58,
+      brightnessPower: 2.9,
     }
   }
 
   return {
     radius: 290,
-    count: 4200,
-    size: 1.2,
-    secondaryCount: 800,
+    count: 5600,
+    size: 1.55,
+    secondaryCount: 1400,
     secondaryRadius: 175,
-    secondarySize: 1.55,
+    secondarySize: 2.02,
+    primaryOpacity: 1.0,
+    secondaryOpacity: 0.68,
+    brightnessBase: 0.82,
+    brightnessRange: 0.56,
+    brightnessPower: 3.2,
   }
 }
 
-function buildStarGeometry(count: number, radius: number, seed: number, shellWidth: number) {
+function buildStarGeometry(count: number, radius: number, seed: number, shellWidth: number, brightnessBase: number, brightnessRange: number, brightnessPower: number) {
   const random = seededRandom(seed)
   const positions = new Float32Array(count * 3)
   const colors = new Float32Array(count * 3)
@@ -83,7 +103,7 @@ function buildStarGeometry(count: number, radius: number, seed: number, shellWid
       : temperature > 0.83
         ? neutral.clone().lerp(warm, (temperature - 0.83) / 0.17)
         : neutral.clone()
-    const brightness = 0.56 + Math.pow(random(), 4) * 0.44
+    const brightness = brightnessBase + Math.pow(random(), brightnessPower) * brightnessRange
     color.multiplyScalar(brightness)
 
     colors[index * 3] = color.r
@@ -102,12 +122,12 @@ function CameraStarfield({ mode }: { mode: SceneMode }) {
   const root = useRef<THREE.Group>(null)
   const settings = starfieldSettings(mode)
   const primaryGeometry = useMemo(
-    () => buildStarGeometry(settings.count, settings.radius, 0x7d31ab + mode.length * 101, 0.3),
-    [mode, settings.count, settings.radius],
+    () => buildStarGeometry(settings.count, settings.radius, 0x7d31ab + mode.length * 101, 0.3, settings.brightnessBase, settings.brightnessRange, settings.brightnessPower),
+    [mode, settings.brightnessBase, settings.brightnessPower, settings.brightnessRange, settings.count, settings.radius],
   )
   const secondaryGeometry = useMemo(
-    () => buildStarGeometry(settings.secondaryCount, settings.secondaryRadius, 0xa13f77 + mode.length * 211, 0.22),
-    [mode, settings.secondaryCount, settings.secondaryRadius],
+    () => buildStarGeometry(settings.secondaryCount, settings.secondaryRadius, 0xa13f77 + mode.length * 211, 0.22, settings.brightnessBase, settings.brightnessRange, settings.brightnessPower),
+    [mode, settings.brightnessBase, settings.brightnessPower, settings.brightnessRange, settings.secondaryCount, settings.secondaryRadius],
   )
 
   useEffect(() => () => {
@@ -130,7 +150,7 @@ function CameraStarfield({ mode }: { mode: SceneMode }) {
           sizeAttenuation={false}
           vertexColors
           transparent
-          opacity={0.82}
+          opacity={settings.primaryOpacity}
           depthWrite={false}
           depthTest
           fog={false}
@@ -143,7 +163,7 @@ function CameraStarfield({ mode }: { mode: SceneMode }) {
           sizeAttenuation={false}
           vertexColors
           transparent
-          opacity={0.42}
+          opacity={settings.secondaryOpacity}
           depthWrite={false}
           depthTest
           fog={false}

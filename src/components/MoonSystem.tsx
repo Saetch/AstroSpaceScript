@@ -54,7 +54,7 @@ function MoonOrbit({
         />
       </mesh>
       <group ref={orbitRoot} rotation={[0, moon.orbitOffset, 0]}>
-        <group ref={focusAnchor} position={[orbitRadius, 0, 0]}>
+        <group ref={focusAnchor} position={[orbitRadius, 0, 0]} userData={{ blackHoleLensingBody: true }}>
           <mesh ref={body}>
             <sphereGeometry args={[bodyRadius, mode === 'system' ? 22 : 36, mode === 'system' ? 22 : 36]} />
             <meshStandardMaterial
@@ -85,11 +85,11 @@ function MoonOrbit({
             <sphereGeometry args={[bodyRadius * (mode === 'system' ? 2.8 : 2.1), 16, 16]} />
             <meshBasicMaterial transparent opacity={0.001} depthWrite={false} />
           </mesh>
-          {(hovered || focused) && (
+          {hovered && (
             <Html center position={[0, bodyRadius + 0.22, 0]} distanceFactor={mode === 'system' ? 9 : 7} style={{ pointerEvents: 'none' }}>
-              <div className={`moon-label ${focused ? 'moon-label--focused' : ''}`}>
+              <div className="moon-label">
                 <strong>{moon.name}</strong>
-                <span>{focused ? 'camera locked' : moon.type}</span>
+                <span>{moon.type}</span>
               </div>
             </Html>
           )}

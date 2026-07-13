@@ -3,6 +3,7 @@ export type Vector3Tuple = [number, number, number]
 export type ConnectionState = 'mock' | 'connecting' | 'live' | 'offline'
 
 export type SystemPrimaryKind = 'star' | 'black-hole'
+export type SystemMapRole = 'standard' | 'galactic-core'
 
 export interface AccretionDiskConfig {
   innerRadius: number
@@ -25,6 +26,10 @@ export interface BlackHoleConfig {
   jetColor?: string
   jetLength?: number
   jetIntensity?: number
+  /** Screen-space point-mass lensing strength used only for presentation. */
+  lensingStrength?: number
+  /** Multiplier applied to the visible lensing field around the accretion disc. */
+  lensingRadiusMultiplier?: number
 }
 
 export type GalaxyMorphology = 'spiral' | 'barred-spiral' | 'elliptical' | 'irregular'
@@ -170,6 +175,8 @@ export interface StarSystem {
   name: string
   position: Vector3Tuple
   primaryKind?: SystemPrimaryKind
+  /** Optional backend-owned presentation role in the galaxy map. */
+  mapRole?: SystemMapRole
   spectralType: string
   starColor: string
   starRadius: number

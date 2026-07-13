@@ -11,7 +11,7 @@ import { GalaxyScene } from './scenes/GalaxyScene'
 import { PlanetScene } from './scenes/PlanetScene'
 import { SolarSystemScene } from './scenes/SolarSystemScene'
 import { buildPlanetSeedKey } from './procedural/planetSeed'
-import { getSystemPrimaryColor, getSystemPrimaryLabel, isBlackHoleSystem } from './components/SystemPrimary'
+import { getSystemPrimaryColor, getSystemPrimaryLabel, isBlackHoleSystem, isGalacticCoreSystem } from './components/SystemPrimary'
 
 const productionPresentation = [
   { key: 'industry', label: 'Industry', icon: 'IND' },
@@ -78,8 +78,9 @@ export default function App() {
     () => (view.type === 'planet' ? system?.planets.find((item) => item.id === view.planetId) : undefined),
     [system, view],
   )
-  const systemColonized = system?.planets.some((item) => item.colonized) ?? false
-  const systemClaimed = Boolean(system?.zoneColor && system?.zoneRadius)
+  const systemIsCore = system ? isGalacticCoreSystem(system) : false
+  const systemColonized = systemIsCore ? false : system?.planets.some((item) => item.colonized) ?? false
+  const systemClaimed = !systemIsCore && Boolean(system?.zoneColor && system?.zoneRadius)
 
   useEffect(() => () => {
     if (transitionTimer.current !== undefined) window.clearTimeout(transitionTimer.current)
@@ -124,6 +125,10 @@ export default function App() {
 
   const systemCameraDistance = useMemo(() => {
     if (!system) return 42
+    if (isGalacticCoreSystem(system)) {
+      const diskRadius = system.blackHole?.accretionDisk?.outerRadius ?? 18
+      return MathUtils.clamp(diskRadius * 9.2, 155, 260)
+    }
     const outerOrbit = Math.max(...system.planets.map((candidate) => candidate.orbitRadius), 8)
     return MathUtils.clamp(outerOrbit * 2.35 * 1.18, 42, 96)
   }, [system])
@@ -134,7 +139,7 @@ export default function App() {
       : view.type === 'galaxy'
         ? { position: [0, 3440, 5520] as [number, number, number], fov: 46, near: 0.1, far: 24000 }
         : view.type === 'system'
-          ? { position: [0, systemCameraDistance * 0.56, systemCameraDistance] as [number, number, number], fov: 46, near: 0.1, far: 700 }
+          ? { position: [0, systemCameraDistance * 0.56, systemCameraDistance] as [number, number, number], fov: 46, near: 0.1, far: systemIsCore ? 1800 : 700 }
           : { position: [0, 1.2, 9] as [number, number, number], fov: 42, near: 0.1, far: 2400 }
 
   function transitionTo(nextView: ViewState, label: string) {
@@ -355,7 +360,7 @@ export default function App() {
             : view.type === 'galaxy'
               ? 'GALACTIC MAP'
               : view.type === 'system'
-                ? (systemColonized ? 'SYSTEM ORRERY' : 'UNCLAIMED SYSTEM')
+                ? (systemIsCore ? 'GALACTIC CORE' : systemColonized ? 'SYSTEM ORRERY' : 'UNCLAIMED SYSTEM')
                 : 'PLANETARY SURVEY'}
         </span>
         <h1>
@@ -375,9 +380,11 @@ export default function App() {
                 ? 'A full-scale galaxy surrounds its highlighted charted region. Zoom toward registered systems to reveal their names.'
                 : 'This galaxy is visible to the player, but no local navigation anchors or system registry have been unlocked yet.')
               : view.type === 'system'
-                ? (systemColonized
-                  ? 'Select a world to open its seeded procedural survey view.'
-                  : 'No permanent population or territorial claim is registered here. Survey a candidate world to establish the first colony.')
+                ? (systemIsCore
+                  ? 'Inspect the supermassive singularity, its incandescent accretion flow, photon ring, and polar jets.'
+                  : systemColonized
+                    ? 'Select a world to open its seeded procedural survey view.'
+                    : 'No permanent population or territorial claim is registered here. Survey a candidate world to establish the first colony.')
                 : 'Drag to orbit. City lights are population-driven and remain visible across the night side.'}
         </p>
       </section>
@@ -525,15 +532,16 @@ export default function App() {
               {galaxySystems.length > 0 ? (
                 <div className="system-list">
                   {galaxySystems.map((item) => {
+                    const galacticCore = isGalacticCoreSystem(item)
                     const colonized = item.planets.some((candidate) => candidate.colonized)
                     return (
-                      <button key={item.id} className={!colonized ? 'system-list__unclaimed' : undefined} onClick={() => openSystem(item.id)}>
+                      <button key={item.id} className={galacticCore ? 'system-list__core' : !colonized ? 'system-list__unclaimed' : undefined} onClick={() => openSystem(item.id)}>
                         <span className="star-swatch" style={{ background: getSystemPrimaryColor(item) }} />
                         <span>
                           <strong>{item.name}</strong>
-                          <small>{isBlackHoleSystem(item) ? `${getSystemPrimaryLabel(item)} · ${colonized ? item.faction : 'unclaimed'}` : colonized ? item.faction : 'Unclaimed · colonization candidate'}</small>
+                          <small>{galacticCore ? `${getSystemPrimaryLabel(item)} · galactic center` : isBlackHoleSystem(item) ? `${getSystemPrimaryLabel(item)} · ${colonized ? item.faction : 'unclaimed'}` : colonized ? item.faction : 'Unclaimed · colonization candidate'}</small>
                         </span>
-                        <b>{colonized ? item.planets.length : 'OPEN'}</b>
+                        <b>{galacticCore ? 'CORE' : colonized ? item.planets.length : 'OPEN'}</b>
                       </button>
                     )
                   })}
@@ -552,16 +560,16 @@ export default function App() {
             <>
               <div className="panel-heading">
                 <span>{getSystemPrimaryLabel(system)}</span>
-                <strong>{systemColonized ? system.population : 'No residents'}</strong>
+                <strong>{systemIsCore ? 'Galactic center' : systemColonized ? system.population : 'No residents'}</strong>
               </div>
               <p className="panel-copy">{system.description}</p>
-              <div className={`system-claim-state ${systemClaimed ? 'system-claim-state--claimed' : 'system-claim-state--open'}`}>
-                <span>{systemClaimed ? 'TERRITORIAL STATUS' : 'COLONIZATION STATUS'}</span>
-                <strong>{systemClaimed ? (system.zoneName ?? system.faction) : 'Outside every registered territory'}</strong>
-                <small>{systemClaimed ? 'This system contributes influence to its merged territorial field.' : `${system.planets.filter((candidate) => !candidate.colonized).length} uncolonized world available for survey.`}</small>
+              <div className={`system-claim-state ${systemIsCore ? 'system-claim-state--core' : systemClaimed ? 'system-claim-state--claimed' : 'system-claim-state--open'}`}>
+                <span>{systemIsCore ? 'CORE CLASSIFICATION' : systemClaimed ? 'TERRITORIAL STATUS' : 'COLONIZATION STATUS'}</span>
+                <strong>{systemIsCore ? 'Supermassive central singularity' : systemClaimed ? (system.zoneName ?? system.faction) : 'Outside every registered territory'}</strong>
+                <small>{systemIsCore ? 'A backend-defined galactic landmark. It is selectable like a system, but is not colonizable.' : systemClaimed ? 'This system contributes influence to its merged territorial field.' : `${system.planets.filter((candidate) => !candidate.colonized).length} uncolonized world available for survey.`}</small>
               </div>
               <dl className="fact-grid">
-                <div><dt>Authority</dt><dd>{systemColonized ? system.faction : 'None'}</dd></div>
+                <div><dt>Authority</dt><dd>{systemIsCore ? 'Core registry' : systemColonized ? system.faction : 'None'}</dd></div>
                 <div><dt>Worlds</dt><dd>{system.planets.length}</dd></div>
                 <div><dt>Primary</dt><dd>{isBlackHoleSystem(system) ? 'Black hole' : 'Star'}</dd></div>
                 {isBlackHoleSystem(system) && system.blackHole && (
@@ -572,18 +580,26 @@ export default function App() {
                   </>
                 )}
               </dl>
-              <div className="system-list">
-                {system.planets.map((item) => (
-                  <button key={item.id} onClick={() => openPlanet(item.id)}>
-                    <span className="planet-swatch" style={{ background: item.color }} />
-                    <span>
-                      <strong>{item.name}</strong>
-                      <small>{item.type}</small>
-                    </span>
-                    <b>↗</b>
-                  </button>
-                ))}
-              </div>
+              {system.planets.length > 0 ? (
+                <div className="system-list">
+                  {system.planets.map((item) => (
+                    <button key={item.id} onClick={() => openPlanet(item.id)}>
+                      <span className="planet-swatch" style={{ background: item.color }} />
+                      <span>
+                        <strong>{item.name}</strong>
+                        <small>{item.type}</small>
+                      </span>
+                      <b>↗</b>
+                    </button>
+                  ))}
+                </div>
+              ) : systemIsCore ? (
+                <div className="core-warning-card">
+                  <span>NO STABLE PLANETARY ORBITS REGISTERED</span>
+                  <strong>Relativistic exclusion zone</strong>
+                  <p>The accretion flow and core dynamics are rendered from backend parameters. No gameplay simulation is performed by the frontend.</p>
+                </div>
+              ) : null}
             </>
           )}
 

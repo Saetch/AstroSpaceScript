@@ -14,7 +14,8 @@ import { hashSeed } from '../procedural/planetSeed'
 import { yawForSubstellarMeshAxis } from '../procedural/tidalOrientation'
 import { MoonSystem } from '../components/MoonSystem'
 import { MoonFocusController, type MoonFocusTarget } from '../components/MoonFocusController'
-import { getSystemPrimaryColor, getSystemPrimaryRadius, SystemPrimaryVisual } from '../components/SystemPrimary'
+import { BlackHoleLensingPass } from '../components/BlackHoleLensingPass'
+import { getSystemPrimaryColor, getSystemPrimaryRadius, isBlackHoleSystem, isGalacticCoreSystem, SystemPrimaryVisual } from '../components/SystemPrimary'
 
 function seededRandom(seed: number) {
   let state = seed >>> 0
@@ -677,6 +678,13 @@ export function PlanetScene({
     return yawForSubstellarMeshAxis(localSunDirection.x, localSunDirection.z)
   }, [inspectionPrimaryLayout, planet.axialTilt])
   const radius = planet.radius * 2.25
+  const inspectionLensingRadius = isBlackHoleSystem(system)
+    ? (system.blackHole?.accretionDisk?.outerRadius ?? getSystemPrimaryRadius(system) * 4)
+      * inspectionPrimaryLayout.scale
+      * (system.blackHole?.lensingRadiusMultiplier ?? (isGalacticCoreSystem(system) ? 1.18 : 1.0))
+    : 0
+  const inspectionLensingStrength = system.blackHole?.lensingStrength
+    ?? (isGalacticCoreSystem(system) ? 1.32 : 0.92)
   const urbanLights = useMemo(() => buildUrbanLightSites(planet, seedKey, radius), [planet, radius, seedKey])
 
   useFrame((_, delta) => {
@@ -685,10 +693,20 @@ export function PlanetScene({
 
   return (
     <group>
+      {isBlackHoleSystem(system) && (
+        <BlackHoleLensingPass
+          worldPosition={inspectionPrimaryLayout.position.toArray() as [number, number, number]}
+          influenceRadius={inspectionLensingRadius}
+          strength={inspectionLensingStrength}
+        />
+      )}
       <InspectionPrimary system={system} planet={planet} />
       <ambientLight intensity={0.2} />
       <hemisphereLight color="#cbdcff" groundColor="#090d19" intensity={0.38} />
-      <group rotation={[0.08, 0, THREE.MathUtils.degToRad(planet.axialTilt)]}>
+      <group
+        rotation={[0.08, 0, THREE.MathUtils.degToRad(planet.axialTilt)]}
+        userData={{ blackHoleLensingBody: true }}
+      >
         <group ref={spinGroup} rotation={[0, tidallyLocked ? lockedInspectionYaw : 0, 0]}>
           <group
             onClick={(event) => {

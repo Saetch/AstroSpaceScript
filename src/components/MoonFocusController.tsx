@@ -130,18 +130,18 @@ export function MoonFocusController({
 
   return (
     <Html fullscreen style={{ pointerEvents: 'none' }}>
-      <div className="moon-focus-hud">
-        <span>MOON LOCK</span>
-        <strong>{focus.label}</strong>
+      <div className="moon-focus-close">
         <button
           type="button"
+          aria-label={`Exit moon focus for ${focus.label}`}
+          title={`Exit moon focus for ${focus.label}`}
           onClick={(event) => {
             event.stopPropagation()
             onClear()
           }}
           style={{ pointerEvents: 'auto' }}
         >
-          Return to overview
+          ×
         </button>
       </div>
     </Html>

@@ -1,4 +1,5 @@
 import { Html, useCursor } from '@react-three/drei'
+import { BlackHoleLensingPass } from '../components/BlackHoleLensingPass'
 import { useFrame } from '@react-three/fiber'
 import { useRef, useState } from 'react'
 import * as THREE from 'three'
@@ -9,7 +10,7 @@ import { buildPlanetSeedKey } from '../procedural/planetSeed'
 import { yawForSubstellarMeshAxis } from '../procedural/tidalOrientation'
 import { MoonSystem } from '../components/MoonSystem'
 import { MoonFocusController, type MoonFocusTarget } from '../components/MoonFocusController'
-import { SystemPrimaryVisual } from '../components/SystemPrimary'
+import { isBlackHoleSystem, isGalacticCoreSystem, SystemPrimaryVisual } from '../components/SystemPrimary'
 
 const ORBIT_SCALE = 2.35
 const ORBIT_ANIMATION_SCALE = 0.28
@@ -87,6 +88,7 @@ function OrbitingPlanet({
   return (
     <group
       ref={positionGroup}
+      userData={{ blackHoleLensingBody: true }}
       position={[
         Math.cos(planet.orbitOffset) * planet.orbitRadius * ORBIT_SCALE,
         0,
@@ -140,12 +142,40 @@ function OrbitingPlanet({
 
 export function SolarSystemScene({ system, onOpenPlanet }: { system: StarSystem; onOpenPlanet: (id: string) => void }) {
   const [focusedMoon, setFocusedMoon] = useState<MoonFocusTarget>()
+  const primaryScale = isGalacticCoreSystem(system) ? 3.625 : 1
+  const lensingInfluenceRadius = ((system.blackHole?.accretionDisk?.outerRadius ?? system.starRadius * 4) * primaryScale)
+    * (system.blackHole?.lensingRadiusMultiplier ?? (isGalacticCoreSystem(system) ? 1.08 : 0.9))
+  const lensingStrength = system.blackHole?.lensingStrength ?? (isGalacticCoreSystem(system) ? 1.32 : 0.92)
 
   return (
     <>
+      {isBlackHoleSystem(system) && (
+        <BlackHoleLensingPass
+          influenceRadius={lensingInfluenceRadius}
+          strength={lensingStrength}
+        />
+      )}
       <SystemSurveyLighting />
       <group rotation={[0.16, -0.15, 0]}>
-      <SystemPrimaryVisual system={system} />
+      <group
+        onClick={(event) => {
+          if (!focusedMoon) return
+          event.stopPropagation()
+          setFocusedMoon(undefined)
+        }}
+      >
+        <SystemPrimaryVisual system={system} scale={primaryScale} />
+        <mesh>
+          <sphereGeometry args={[
+            isBlackHoleSystem(system)
+              ? Math.max(system.blackHole?.eventHorizonRadius ?? system.starRadius, 0.1) * primaryScale * 1.45
+              : system.starRadius * primaryScale * 1.3,
+            24,
+            24,
+          ]} />
+          <meshBasicMaterial transparent opacity={0} depthWrite={false} colorWrite={false} />
+        </mesh>
+      </group>
       {system.planets.map((planet, planetIndex) => (
         <group
           key={planet.id}
