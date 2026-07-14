@@ -8,6 +8,10 @@ export interface UniverseRepository {
   subscribe(listener: UniverseListener): () => void
   connect(): void
   disconnect(): void
+  /** Keep a full system record/subscription available while navigating inside it. */
+  retainSystem(systemId: string): void
+  /** Release a previously retained system after leaving its navigation subtree. */
+  releaseSystem(systemId: string): void
   colonizePlanet(systemId: string, planetId: string): Promise<void>
 }
 
@@ -62,6 +66,7 @@ function colonizedSystem(system: StarSystem, planetId: string): StarSystem {
 
 export class MockUniverseRepository implements UniverseRepository {
   private listeners = new Set<UniverseListener>()
+  private retainedSystems = new Map<string, number>()
 
   private snapshot: UniverseSnapshot = {
     galaxies: structuredClone(mockGalaxies),
@@ -81,6 +86,16 @@ export class MockUniverseRepository implements UniverseRepository {
 
   connect = () => undefined
   disconnect = () => undefined
+
+  retainSystem = (systemId: string) => {
+    this.retainedSystems.set(systemId, (this.retainedSystems.get(systemId) ?? 0) + 1)
+  }
+
+  releaseSystem = (systemId: string) => {
+    const remaining = (this.retainedSystems.get(systemId) ?? 1) - 1
+    if (remaining > 0) this.retainedSystems.set(systemId, remaining)
+    else this.retainedSystems.delete(systemId)
+  }
 
   colonizePlanet = async (systemId: string, planetId: string) => {
     const system = this.snapshot.systems.find((item) => item.id === systemId)

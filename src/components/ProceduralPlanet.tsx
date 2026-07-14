@@ -1,5 +1,5 @@
 import { ThreeEvent } from '@react-three/fiber'
-import { useMemo } from 'react'
+import { useEffect, useMemo } from 'react'
 import * as THREE from 'three'
 import type { Planet } from '../domain/universe'
 import { describePlanetArchetype, hashSeed } from '../procedural/planetSeed'
@@ -17,6 +17,79 @@ type PlanetMaps = {
   cloudOpacity: number
   displacementScale: number
   bumpScale: number
+}
+
+type PlanetMapCacheEntry = {
+  maps: PlanetMaps
+  users: number
+  lastUsed: number
+}
+
+const PLANET_MAP_CACHE_LIMIT = 12
+const planetMapCache = new Map<string, PlanetMapCacheEntry>()
+let planetMapCacheTrimTimer: ReturnType<typeof setTimeout> | undefined
+
+function disposePlanetMaps(maps: PlanetMaps) {
+  maps.colorMap.dispose()
+  maps.bumpMap.dispose()
+  maps.roughnessMap.dispose()
+  maps.emissiveMap.dispose()
+  maps.alphaCloudMap.dispose()
+}
+
+function trimPlanetMapCache() {
+  planetMapCacheTrimTimer = undefined
+  if (planetMapCache.size <= PLANET_MAP_CACHE_LIMIT) return
+
+  const removable = [...planetMapCache.entries()]
+    .filter(([, entry]) => entry.users === 0)
+    .sort((a, b) => a[1].lastUsed - b[1].lastUsed)
+
+  for (const [key, entry] of removable) {
+    if (planetMapCache.size <= PLANET_MAP_CACHE_LIMIT) break
+    planetMapCache.delete(key)
+    disposePlanetMaps(entry.maps)
+  }
+}
+
+function schedulePlanetMapCacheTrim() {
+  if (planetMapCacheTrimTimer !== undefined) return
+  planetMapCacheTrimTimer = setTimeout(trimPlanetMapCache, 0)
+}
+
+function planetVisualCacheKey(planet: Planet, seedKey: string, detail: DetailLevel) {
+  return JSON.stringify({
+    seedKey,
+    detail,
+    id: planet.id,
+    type: planet.type,
+    radius: planet.radius,
+    color: planet.color,
+    secondaryColor: planet.secondaryColor,
+    temperature: planet.temperature,
+    population: planet.population,
+    landFraction: planet.landFraction,
+    atmosphere: planet.atmosphere,
+    tidallyLocked: planet.tidallyLocked,
+  })
+}
+
+function getCachedPlanetMaps(planet: Planet, seedKey: string, detail: DetailLevel) {
+  const key = planetVisualCacheKey(planet, seedKey, detail)
+  const existing = planetMapCache.get(key)
+  if (existing) {
+    existing.lastUsed = performance.now()
+    return { key, entry: existing }
+  }
+
+  const entry: PlanetMapCacheEntry = {
+    maps: createPlanetMaps(planet, seedKey, detail),
+    users: 0,
+    lastUsed: performance.now(),
+  }
+  planetMapCache.set(key, entry)
+  schedulePlanetMapCacheTrim()
+  return { key, entry }
 }
 
 type SurfaceShape = {
@@ -714,7 +787,22 @@ export function ProceduralPlanet({ planet, seedKey, detail = 'system', radius, o
   radius: number
   onClick?: (event: ThreeEvent<MouseEvent>) => void
 }) {
-  const maps = useMemo(() => createPlanetMaps(planet, seedKey, detail), [detail, planet, seedKey])
+  const cached = useMemo(
+    () => getCachedPlanetMaps(planet, seedKey, detail),
+    [detail, planet, seedKey],
+  )
+  const maps = cached.entry.maps
+
+  useEffect(() => {
+    cached.entry.users += 1
+    cached.entry.lastUsed = performance.now()
+    return () => {
+      cached.entry.users = Math.max(0, cached.entry.users - 1)
+      cached.entry.lastUsed = performance.now()
+      schedulePlanetMapCacheTrim()
+    }
+  }, [cached])
+
   const segmentCount = detail === 'detail' ? 164 : 96
 
   return (

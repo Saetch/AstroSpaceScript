@@ -55,6 +55,7 @@ export default function App() {
   const [colonizationSequence, setColonizationSequence] = useState(0)
   const [transitionLabel, setTransitionLabel] = useState<string>()
   const transitionTimer = useRef<number | undefined>(undefined)
+  const activeSystemId = view.type === 'system' || view.type === 'planet' ? view.systemId : undefined
 
   const galaxy = useMemo(
     () => (view.type === 'universe' ? undefined : universe.galaxies.find((item) => item.id === view.galaxyId)),
@@ -85,6 +86,12 @@ export default function App() {
   useEffect(() => () => {
     if (transitionTimer.current !== undefined) window.clearTimeout(transitionTimer.current)
   }, [])
+
+  useEffect(() => {
+    if (!activeSystemId) return
+    universeRepository.retainSystem(activeSystemId)
+    return () => universeRepository.releaseSystem(activeSystemId)
+  }, [activeSystemId])
 
   const planetSeedKey = useMemo(() => {
     if (!system || !planet) return undefined
@@ -166,6 +173,18 @@ export default function App() {
     const nextSystem = universe.systems.find((item) => item.id === systemId)
     if (!nextSystem) return
     setSelectedPoint(undefined)
+
+    // Returning from a planet to its already-retained parent system is local
+    // navigation. Skip the artificial transit delay and use the cached system
+    // record plus cached procedural maps immediately.
+    if (view.type === 'planet' && view.systemId === systemId) {
+      if (transitionTimer.current !== undefined) window.clearTimeout(transitionTimer.current)
+      setTransitionLabel(undefined)
+      setView({ type: 'system', galaxyId: nextSystem.galaxyId, systemId })
+      setPanelOpen(true)
+      return
+    }
+
     transitionTo(
       { type: 'system', galaxyId: nextSystem.galaxyId, systemId },
       `Resolving ${nextSystem.name}`,

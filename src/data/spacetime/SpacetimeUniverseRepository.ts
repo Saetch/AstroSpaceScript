@@ -7,6 +7,10 @@ export interface SpacetimeUniverseAdapter {
     onError: (error: unknown) => void
   }): void | Promise<void>
   disconnect(): void
+  /** Optional narrow subscription hook for a full selected-system payload. */
+  retainSystem?(systemId: string): void | Promise<void>
+  /** Optional counterpart used after leaving the selected system. */
+  releaseSystem?(systemId: string): void | Promise<void>
   colonizePlanet?(systemId: string, planetId: string): void | Promise<void>
 }
 
@@ -28,6 +32,8 @@ const EMPTY_SNAPSHOT: UniverseSnapshot = {
 export class SpacetimeUniverseRepository implements UniverseRepository {
   private listeners = new Set<UniverseListener>()
   private snapshot: UniverseSnapshot
+  private retainedSystemRefs = new Map<string, number>()
+  private retainedSystemCache = new Map<string, UniverseSnapshot['systems'][number]>()
 
   constructor(
     private readonly adapter: SpacetimeUniverseAdapter,
@@ -56,6 +62,24 @@ export class SpacetimeUniverseRepository implements UniverseRepository {
     this.setSnapshot({ ...this.snapshot, connection: 'offline' })
   }
 
+  retainSystem = (systemId: string) => {
+    this.retainedSystemRefs.set(systemId, (this.retainedSystemRefs.get(systemId) ?? 0) + 1)
+    const current = this.snapshot.systems.find((system) => system.id === systemId)
+    if (current) this.retainedSystemCache.set(systemId, current)
+    void this.adapter.retainSystem?.(systemId)
+  }
+
+  releaseSystem = (systemId: string) => {
+    const remaining = (this.retainedSystemRefs.get(systemId) ?? 1) - 1
+    if (remaining > 0) {
+      this.retainedSystemRefs.set(systemId, remaining)
+      return
+    }
+    this.retainedSystemRefs.delete(systemId)
+    this.retainedSystemCache.delete(systemId)
+    void this.adapter.releaseSystem?.(systemId)
+  }
+
   colonizePlanet = async (systemId: string, planetId: string) => {
     if (!this.adapter.colonizePlanet) {
       throw new Error('The SpaceTimeDB adapter does not expose a colonization reducer yet.')
@@ -64,7 +88,19 @@ export class SpacetimeUniverseRepository implements UniverseRepository {
   }
 
   private setSnapshot(snapshot: UniverseSnapshot) {
-    this.snapshot = snapshot
+    snapshot.systems.forEach((system) => {
+      if (this.retainedSystemRefs.has(system.id)) this.retainedSystemCache.set(system.id, system)
+    })
+
+    const presentIds = new Set(snapshot.systems.map((system) => system.id))
+    const retainedMissing = [...this.retainedSystemRefs.keys()]
+      .filter((systemId) => !presentIds.has(systemId))
+      .map((systemId) => this.retainedSystemCache.get(systemId))
+      .filter((system): system is UniverseSnapshot['systems'][number] => Boolean(system))
+
+    this.snapshot = retainedMissing.length > 0
+      ? { ...snapshot, systems: [...snapshot.systems, ...retainedMissing] }
+      : snapshot
     this.listeners.forEach((listener) => listener())
   }
 }
