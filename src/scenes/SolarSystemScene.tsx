@@ -80,8 +80,7 @@ function OrbitingPlanet({
     }
 
     if (tiltGroup.current) {
-      const pulse = 1 + Math.sin(state.clock.elapsedTime * 2.4) * 0.018
-      tiltGroup.current.scale.setScalar(hovered ? pulse * 1.12 : pulse)
+      tiltGroup.current.scale.setScalar(hovered ?  1.12 : 1)
     }
   })
 
