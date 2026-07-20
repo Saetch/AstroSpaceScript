@@ -37,7 +37,7 @@ function convertToGalaxy(row: GalaxyRow): Galaxy {
 }
 
 export function UniverseSpaceTimeBridge(){
-    const [rows, isLoading] = useTable(tables.galaxy)
+    const [rows, isReady] = useTable(tables.galaxy)
 
 
     const galaxies = useMemo(
@@ -47,12 +47,10 @@ export function UniverseSpaceTimeBridge(){
     )
 
     useEffect(() => {
-        if(isLoading) {
-            return;
-        }
+
         universeRepository.setGalaxies(galaxies)
 
-    }, [galaxies, isLoading])
+    }, [galaxies, isReady])
 
     return null
 
