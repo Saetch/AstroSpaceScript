@@ -1,4 +1,4 @@
-use spacetimedb::{ReducerContext, Table};
+use spacetimedb::{ProcedureContext, ReducerContext, Table};
 
 #[spacetimedb::table(accessor = person, public)]
 pub struct Person {
@@ -25,10 +25,9 @@ pub fn add(ctx: &ReducerContext, name: String) {
     ctx.db.person().insert(Person { name });
 }
 
-#[spacetimedb::reducer]
-pub fn count(ctx: &ReducerContext) -> usize{
-    let count = ctx.db.person().iter().count();
-    return count;
+#[spacetimedb::procedure]
+pub fn count(ctx: &mut ProcedureContext) -> u64 {
+    ctx.with_tx(|tx| tx.db.person().count())
 }
 
 #[spacetimedb::reducer]
