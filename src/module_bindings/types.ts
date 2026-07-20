@@ -19,7 +19,7 @@ export const Galaxy = __t.object("Galaxy", {
   radius: __t.f32(),
   thickness: __t.f32(),
   rotation: __t.f32(),
-  get inclanation() {
+  get inclination() {
     return __t.option(Vec3);
   },
   morphology: __t.string(),

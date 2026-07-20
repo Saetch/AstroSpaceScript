@@ -9,13 +9,14 @@ pub struct Person {
 
 #[spacetimedb::table(accessor = galaxy, public)]
 pub struct Galaxy {
-    id: String,
+    #[primary_key]
+    pub id: String,
     name: String,
     position: Vec3,
     radius: f32,
     thickness: f32,
     rotation: f32,
-    inclanation: Option<Vec3>,
+    inclination: Option<Vec3>,
     morphology: String,
     primary_color: String,
     secondary_color: String,
@@ -44,7 +45,7 @@ pub fn init(ctx: &ReducerContext) {
         radius: 128.0,
         thickness: 10.0,
         rotation: -0.18,
-        inclanation: None,
+        inclination: None,
         morphology: "spiral".to_string(),
         primary_color: "#7f9cff".to_string(),
         secondary_color: "#ffd2a1".to_string(),
@@ -57,11 +58,45 @@ pub fn init(ctx: &ReducerContext) {
         companions: None,
         home: Some(true),
     });
+
+
+    ctx.db.galaxy().insert(Galaxy {
+        id: "perseus-destroyer".to_string(),
+        name: "The Perseus Destroyer".to_string(),
+        position: Vec3 {x:600.0, y:10.0, z:200.0},
+        radius: 368.0,
+        thickness: 40.0,
+        rotation: -0.68,
+        inclination: None,
+        morphology: "spiral".to_string(),
+        primary_color: "#2f9cff".to_string(),
+        secondary_color: "#ffe211".to_string(),
+        description: "the home galaxy and the origin of all".to_string(),
+        discovered_by: "Native astronomy".to_string(),
+        estimated_systems: "180-200 billion".to_string(),
+        seed: 12.0,
+        arm_count: None,
+        arm_winding: None,
+        companions: None,
+        home: Some(false),
+    });
 }
 
 #[spacetimedb::reducer(client_connected)]
 pub fn identity_connected(_ctx: &ReducerContext) {
     // Called everytime a new client connects
+}
+
+#[spacetimedb::reducer]
+pub fn close_in(ctx: &ReducerContext){
+    log::info!("Closing in...");
+    ctx.db.galaxy().iter().filter(|g| g.id == "perseus-destroyer").for_each(|mut g| {
+        g.position.x -= 60.0;
+        g.position.z -= 20.0;
+        log::info!("Position: {:?}", g.position.x);
+
+        ctx.db.galaxy().id().update(g);
+    })
 }
 
 #[spacetimedb::reducer(client_disconnected)]

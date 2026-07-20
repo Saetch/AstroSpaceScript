@@ -35,6 +35,7 @@ import {
 
 // Import all reducer arg schemas
 import AddReducer from "./add_reducer";
+import CloseInReducer from "./close_in_reducer";
 import SayHelloReducer from "./say_hello_reducer";
 
 // Import all procedure arg schemas
@@ -51,8 +52,12 @@ const tablesSchema = __schema({
   galaxy: __table({
     name: 'galaxy',
     indexes: [
+      { accessor: 'id', name: 'galaxy_id_idx_btree', algorithm: 'btree', columns: [
+        'id',
+      ] },
     ],
     constraints: [
+      { name: 'galaxy_id_key', constraint: 'unique', columns: ['id'] },
     ],
   }, GalaxyRow),
   person: __table({
@@ -67,6 +72,7 @@ const tablesSchema = __schema({
 /** The schema information for all reducers in this module. This is defined the same way as the reducers would have been defined in the server, except the body of the reducer is omitted in code generation. */
 const reducersSchema = __reducers(
   __reducerSchema("add", AddReducer),
+  __reducerSchema("close_in", CloseInReducer),
   __reducerSchema("say_hello", SayHelloReducer),
 );
 

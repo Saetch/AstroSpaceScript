@@ -1,4 +1,4 @@
-import type { Planet, StarSystem, UniverseSnapshot } from '../domain/universe'
+import type {Galaxy, Planet, StarSystem, UniverseSnapshot} from '../domain/universe'
 import { mockGalaxies, mockSystems, mockTrafficRoutes } from './mockUniverse'
 
 export type UniverseListener = () => void
@@ -8,6 +8,8 @@ export interface UniverseRepository {
   subscribe(listener: UniverseListener): () => void
   connect(): void
   disconnect(): void
+
+  setGalaxies(galaxies: Galaxy[]): void
   /** Keep a full system record/subscription available while navigating inside it. */
   retainSystem(systemId: string): void
   /** Release a previously retained system after leaving its navigation subtree. */
@@ -75,6 +77,16 @@ export class MockUniverseRepository implements UniverseRepository {
     connection: 'mock',
     updatedAt: new Date().toISOString(),
     onlinePlayers: 128,
+  }
+
+  setGalaxies(galaxies: Galaxy[]): void {
+    this.snapshot = {
+      ...this.snapshot,
+      galaxies: galaxies,
+      connection: 'live',
+      updatedAt: new Date().toISOString(),
+    }
+    this.listeners.forEach((listener: UniverseListener): void => {listener()})
   }
 
   getSnapshot = () => this.snapshot

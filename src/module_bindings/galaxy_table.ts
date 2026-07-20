@@ -15,7 +15,7 @@ import {
 
 
 export default __t.row({
-  id: __t.string(),
+  id: __t.string().primaryKey(),
   name: __t.string(),
   get position() {
     return Vec3;
@@ -23,7 +23,7 @@ export default __t.row({
   radius: __t.f32(),
   thickness: __t.f32(),
   rotation: __t.f32(),
-  get inclanation() {
+  get inclination() {
     return __t.option(Vec3);
   },
   morphology: __t.string(),

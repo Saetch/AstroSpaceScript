@@ -7,6 +7,7 @@ import { SpacetimeDBProvider } from 'spacetimedb/react';
 import { DbConnection, ErrorContext } from './module_bindings';
 
 import './styles.css'
+import {UniverseSpaceTimeBridge} from "./data/UniverseSpaceTimeBridge";
 
 const HOST = import.meta.env.VITE_SPACETIMEDB_HOST ?? 'ws://localhost:3003';
 const DB_NAME = import.meta.env.VITE_SPACETIMEDB_DB_NAME ?? 'rust-project';
@@ -39,6 +40,7 @@ const connectionBuilder = DbConnection.builder()
 createRoot(document.getElementById('root')!).render(
     <StrictMode>
         <SpacetimeDBProvider connectionBuilder={connectionBuilder}>
+            <UniverseSpaceTimeBridge />
             <App />
         </SpacetimeDBProvider>
     </StrictMode>
