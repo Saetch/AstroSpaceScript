@@ -41,12 +41,20 @@ import SayHelloReducer from "./say_hello_reducer";
 import * as CountProcedure from "./count_procedure";
 
 // Import all table schema definitions
+import GalaxyRow from "./galaxy_table";
 import PersonRow from "./person_table";
 
 /** Type-only namespace exports for generated type groups. */
 
 /** The schema information for all tables in this module. This is defined the same was as the tables would have been defined in the server. */
 const tablesSchema = __schema({
+  galaxy: __table({
+    name: 'galaxy',
+    indexes: [
+    ],
+    constraints: [
+    ],
+  }, GalaxyRow),
   person: __table({
     name: 'person',
     indexes: [

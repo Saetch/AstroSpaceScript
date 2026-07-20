@@ -9,8 +9,12 @@ import {
   type AlgebraicTypeType as __AlgebraicTypeType,
   type Infer as __Infer,
 } from "spacetimedb";
+import {
+  Vec3,
+} from "./types";
 
-export const Galaxy = __t.object("Galaxy", {
+
+export default __t.row({
   id: __t.string(),
   name: __t.string(),
   get position() {
@@ -23,28 +27,14 @@ export const Galaxy = __t.object("Galaxy", {
     return __t.option(Vec3);
   },
   morphology: __t.string(),
-  primaryColor: __t.string(),
-  secondaryColor: __t.string(),
+  primaryColor: __t.string().name("primary_color"),
+  secondaryColor: __t.string().name("secondary_color"),
   description: __t.string(),
-  discoveredBy: __t.string(),
-  estimatedSystems: __t.string(),
+  discoveredBy: __t.string().name("discovered_by"),
+  estimatedSystems: __t.string().name("estimated_systems"),
   seed: __t.f32(),
-  armCount: __t.option(__t.u16()),
-  armWinding: __t.option(__t.f32()),
+  armCount: __t.option(__t.u16()).name("arm_count"),
+  armWinding: __t.option(__t.f32()).name("arm_winding"),
   companions: __t.option(__t.string()),
   home: __t.option(__t.bool()),
 });
-export type Galaxy = __Infer<typeof Galaxy>;
-
-export const Person = __t.object("Person", {
-  name: __t.string(),
-});
-export type Person = __Infer<typeof Person>;
-
-export const Vec3 = __t.object("Vec3", {
-  x: __t.f32(),
-  y: __t.f32(),
-  z: __t.f32(),
-});
-export type Vec3 = __Infer<typeof Vec3>;
-

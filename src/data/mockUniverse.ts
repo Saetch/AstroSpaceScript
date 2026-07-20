@@ -74,7 +74,7 @@ export const mockGalaxies: Galaxy[] = [
     position: [-470, 12, 250],
     radius: 104,
     thickness: 12,
-    rotation: -0.58,
+    rotation: 1.2,
     morphology: 'barred-spiral',
     primaryColor: '#ff8d68',
     secondaryColor: '#ffd178',
