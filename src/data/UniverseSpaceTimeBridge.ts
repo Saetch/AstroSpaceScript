@@ -7,7 +7,7 @@ import {Vector3Tuple} from "three";
 import {universeRepository} from "./UniverseRepository";
 
 function convertToGalaxy(row: GalaxyRow): Galaxy {
-    const inclination = row.inclanation
+    const inclination = row.inclination
     let inc: Vector3Tuple | undefined = undefined
     if (inclination) {
         inc = [inclination.x, inclination.y, inclination.z]
