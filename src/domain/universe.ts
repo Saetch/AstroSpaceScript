@@ -8,11 +8,21 @@ export interface PlayerIdentity {
   name: string
 }
 
+export enum PlayerRelation {
+  Neutral = 'neutral',
+  Friendly = 'friendly',
+  Allied = 'allied',
+  ColdWar = 'cold-war',
+  Enemy = 'enemy',
+}
+
 export interface PlayerOwnership {
   /** Stable backend player id. Prefer this over comparing display names. */
   playerId?: string
   /** Last known display name for UI and offline snapshots. */
   playerName?: string
+  /** Diplomatic relation from the current player to this owner. Foreign owners default to neutral. */
+  relation?: PlayerRelation
   /** Temporary mock/client hint until ownership is supplied by SpacetimeDB. */
   isCurrentPlayer?: boolean
 }

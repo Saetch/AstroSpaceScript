@@ -1,4 +1,4 @@
-import type { Galaxy, Moon, PlayerOwnership, StarSystem, TrafficRoute } from '../domain/universe'
+import { PlayerRelation, type Galaxy, type Moon, type PlayerOwnership, type StarSystem, type TrafficRoute } from '../domain/universe'
 
 
 function mockOrbitInclination(id: string) {
@@ -38,8 +38,8 @@ function mockMoon(
 
 const currentPlayerOwner: PlayerOwnership = { isCurrentPlayer: true }
 
-function otherPlayerOwner(playerId: string, playerName: string): PlayerOwnership {
-  return { playerId, playerName }
+function otherPlayerOwner(playerId: string, playerName: string, relation: PlayerRelation): PlayerOwnership {
+  return { playerId, playerName, relation }
 }
 
 export const mockGalaxies: Galaxy[] = [
@@ -266,7 +266,7 @@ const mockSystemDefinitions: StarSystem[] = [
     zoneRadius: 38,
     zoneStrength: 1.05,
     zoneName: 'Atlas Compact',
-    owner: otherPlayerOwner('player-astra-vale', 'AstraVale'),
+    owner: otherPlayerOwner('player-astra-vale', 'AstraVale', PlayerRelation.Friendly),
     description: 'A frontier system split between survey guilds and independent habitats.',
     faction: 'Free Navigators',
     population: '640 million',
@@ -371,7 +371,7 @@ const mockSystemDefinitions: StarSystem[] = [
     zoneRadius: 36,
     zoneStrength: 0.92,
     zoneName: 'Atlas Compact',
-    owner: otherPlayerOwner('player-orion-jack', 'OrionJack'),
+    owner: otherPlayerOwner('player-orion-jack', 'OrionJack', PlayerRelation.Allied),
     description: 'A brilliant high-energy star with wealthy orbital polities.',
     faction: 'Crown Compact',
     population: '3.1 billion',
@@ -575,7 +575,7 @@ const mockSystemDefinitions: StarSystem[] = [
     zoneRadius: 44,
     zoneStrength: 1.08,
     zoneName: 'Atlas Compact',
-    owner: otherPlayerOwner('player-lyra-m', 'LyraM'),
+    owner: otherPlayerOwner('player-lyra-m', 'LyraM', PlayerRelation.ColdWar),
     description: 'A prosperous six-world system extending the Compact eastward along the local spiral arm.',
     faction: 'Asterion Development League',
     population: '6.8 billion',
@@ -833,6 +833,7 @@ const mockSystemDefinitions: StarSystem[] = [
     spectralType: 'Rapidly rotating Kerr black hole',
     starColor: '#ffb36b',
     starRadius: 1.35,
+    owner: otherPlayerOwner('player-vanta-corsair', 'VantaCorsair', PlayerRelation.Enemy),
     blackHole: {
       massSolar: 184000,
       eventHorizonRadius: 1.35,

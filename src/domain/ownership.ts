@@ -1,9 +1,11 @@
-import type { Planet, PlayerIdentity, PlayerOwnership, StarSystem } from './universe'
+import { PlayerRelation, type Planet, type PlayerIdentity, type PlayerOwnership, type StarSystem } from './universe'
 
 export type OwnershipRelation = 'self' | 'other' | 'unclaimed'
+export type OwnershipTone = 'self' | 'unclaimed' | PlayerRelation
 
 export interface ResolvedOwnership {
   relation: OwnershipRelation
+  diplomacy?: PlayerRelation
   playerId?: string
   playerName?: string
 }
@@ -30,6 +32,7 @@ export function resolveOwnership(
 
   return {
     relation: 'other',
+    diplomacy: owner.relation ?? PlayerRelation.Neutral,
     playerId: owner.playerId,
     playerName: owner.playerName ?? 'Unknown player',
   }
@@ -51,15 +54,86 @@ export function ownershipKey(owner: PlayerOwnership | undefined) {
   return owner.playerId ?? owner.playerName ?? 'unknown-player'
 }
 
+export function ownershipTone(ownership: ResolvedOwnership | undefined): OwnershipTone {
+  if (!ownership || ownership.relation === 'unclaimed') return 'unclaimed'
+  if (ownership.relation === 'self') return 'self'
+  return ownership.diplomacy ?? PlayerRelation.Neutral
+}
+
+export function playerRelationLabel(ownership: ResolvedOwnership | undefined) {
+  if (!ownership || ownership.relation === 'unclaimed') return 'Unclaimed'
+  if (ownership.relation === 'self') return 'Yours'
+
+  switch (ownership.diplomacy ?? PlayerRelation.Neutral) {
+    case PlayerRelation.Friendly:
+      return 'Friendly'
+    case PlayerRelation.Allied:
+      return 'Allied'
+    case PlayerRelation.ColdWar:
+      return 'Cold War'
+    case PlayerRelation.Enemy:
+      return 'Enemy · At War'
+    case PlayerRelation.Neutral:
+    default:
+      return 'Neutral'
+  }
+}
+
+export function ownershipBadgeLabel(ownership: ResolvedOwnership) {
+  if (ownership.relation === 'self') return 'YOURS'
+  if (ownership.relation === 'unclaimed') return 'OPEN'
+
+  switch (ownership.diplomacy ?? PlayerRelation.Neutral) {
+    case PlayerRelation.Friendly:
+      return 'FRIEND'
+    case PlayerRelation.Allied:
+      return 'ALLY'
+    case PlayerRelation.ColdWar:
+      return 'COLD WAR'
+    case PlayerRelation.Enemy:
+      return 'WAR'
+    case PlayerRelation.Neutral:
+    default:
+      return 'NEUTRAL'
+  }
+}
+
+export function relationshipDescription(ownership: ResolvedOwnership) {
+  if (ownership.relation === 'self') {
+    return 'This territory is under your direct control.'
+  }
+  if (ownership.relation === 'unclaimed') {
+    return 'No registered player currently controls this location.'
+  }
+
+  switch (ownership.diplomacy ?? PlayerRelation.Neutral) {
+    case PlayerRelation.Friendly:
+      return 'Friendly relations permit routine access and cooperation.'
+    case PlayerRelation.Allied:
+      return 'An allied player controls this location under a mutual-defense relationship.'
+    case PlayerRelation.ColdWar:
+      return 'Relations are hostile but no declared war is currently active.'
+    case PlayerRelation.Enemy:
+      return 'This location is controlled by an enemy player during an active war.'
+    case PlayerRelation.Neutral:
+    default:
+      return 'No formal cooperation or conflict is currently registered.'
+  }
+}
+
 export function systemOwnershipLabel(ownership: ResolvedOwnership) {
   if (ownership.relation === 'self') return 'YOUR SYSTEM'
-  if (ownership.relation === 'other') return ownership.playerName ?? 'PLAYER SYSTEM'
+  if (ownership.relation === 'other') {
+    return `${playerRelationLabel(ownership).toUpperCase()} · ${ownership.playerName ?? 'PLAYER'}`
+  }
   return 'UNCLAIMED'
 }
 
 export function planetOwnershipLabel(ownership: ResolvedOwnership) {
   if (ownership.relation === 'self') return 'YOUR COLONY'
-  if (ownership.relation === 'other') return ownership.playerName ?? 'PLAYER COLONY'
+  if (ownership.relation === 'other') {
+    return `${playerRelationLabel(ownership).toUpperCase()} · ${ownership.playerName ?? 'PLAYER'}`
+  }
   return 'UNCLAIMED WORLD'
 }
 

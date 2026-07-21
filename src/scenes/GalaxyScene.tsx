@@ -7,7 +7,7 @@ import type { Galaxy, PlayerIdentity, StarSystem, TrafficRoute } from '../domain
 import { buildGalaxyInteractionStreams, buildGalaxyPointGeometry, galaxyGroupExtent, getGalaxyBodies } from '../procedural/galaxyGeometry'
 import { getSystemPrimaryColor, getSystemPrimaryRadius, isBlackHoleSystem, isGalacticCoreSystem, SystemPrimaryVisual } from '../components/SystemPrimary'
 import { GalaxyTrafficRoutes } from '../components/GalaxyTrafficRoutes'
-import { ownershipKey, resolveOwnership, systemOwnershipLabel } from '../domain/ownership'
+import { ownershipKey, ownershipTone, resolveOwnership, systemOwnershipLabel } from '../domain/ownership'
 
 const GALAXY_WORLD_SCALE = 4
 const BASE_GALAXY_RADIUS = 600
@@ -518,6 +518,7 @@ function SystemBeacon({ system, position, hovered, labelsVisible, currentPlayer,
 }) {
   const ownership = resolveOwnership(system.owner, currentPlayer)
   const claimed = ownership.relation !== 'unclaimed'
+  const tone = ownershipTone(ownership)
   const blackHole = isBlackHoleSystem(system)
   const beaconColor = blackHole ? getSystemPrimaryColor(system) : claimed ? system.zoneColor ?? '#87dcff' : '#f3bb65'
 
@@ -553,7 +554,7 @@ function SystemBeacon({ system, position, hovered, labelsVisible, currentPlayer,
       </mesh>
       {(labelsVisible || hovered) && (
         <Html center position={[0, 13, 0]} style={{ pointerEvents: 'none' }}>
-          <div className={`world-label system-label system-label--${ownership.relation} ${hovered ? 'world-label--active' : ''}`}>
+          <div className={`world-label system-label relationship-label relationship-label--${tone} ${hovered ? 'world-label--active' : ''}`}>
             <strong>{system.name}</strong>
             <span>
               {blackHole

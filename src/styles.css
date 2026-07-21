@@ -1004,3 +1004,157 @@ button.galaxy-overview-label:focus-visible {
   background: linear-gradient(145deg, rgba(40, 27, 68, 0.5), rgba(8, 13, 29, 0.66));
 }
 .colonization-state--other span { color: #c3a6ff; }
+
+/* Diplomatic relationship themes.
+ * Ownership and diplomacy are intentionally separate: self/unclaimed are
+ * ownership states, while foreign owners use PlayerRelation values. */
+.relationship-card--self,
+.relationship-label--self,
+.relationship-panel--self {
+  --relation-rgb: 91, 217, 255;
+  --relation-accent: #75e4ff;
+}
+
+.relationship-card--unclaimed,
+.relationship-label--unclaimed,
+.relationship-panel--unclaimed {
+  --relation-rgb: 147, 156, 174;
+  --relation-accent: #b7bfce;
+}
+
+.relationship-card--neutral,
+.relationship-label--neutral,
+.relationship-panel--neutral {
+  --relation-rgb: 166, 177, 211;
+  --relation-accent: #c7d0ec;
+}
+
+.relationship-card--friendly,
+.relationship-label--friendly,
+.relationship-panel--friendly {
+  --relation-rgb: 91, 218, 160;
+  --relation-accent: #7de8b4;
+}
+
+.relationship-card--allied,
+.relationship-label--allied,
+.relationship-panel--allied {
+  --relation-rgb: 89, 196, 255;
+  --relation-accent: #7bd8ff;
+}
+
+.relationship-card--cold-war,
+.relationship-label--cold-war,
+.relationship-panel--cold-war {
+  --relation-rgb: 232, 171, 78;
+  --relation-accent: #f1bd68;
+}
+
+.relationship-card--enemy,
+.relationship-label--enemy,
+.relationship-panel--enemy {
+  --relation-rgb: 238, 78, 96;
+  --relation-accent: #ff7b89;
+}
+
+.relationship-card {
+  border-color: rgba(var(--relation-rgb), 0.34) !important;
+  background:
+    linear-gradient(145deg, rgba(var(--relation-rgb), 0.17), rgba(8, 13, 29, 0.7)) !important;
+  box-shadow: inset 0 1px rgba(255, 255, 255, 0.035);
+}
+
+.relationship-card:hover {
+  border-color: rgba(var(--relation-rgb), 0.68) !important;
+  background:
+    linear-gradient(145deg, rgba(var(--relation-rgb), 0.24), rgba(10, 16, 34, 0.78)) !important;
+}
+
+.relationship-card b,
+.system-claim-state.relationship-card > span,
+.colonization-state.relationship-card > span {
+  color: var(--relation-accent) !important;
+}
+
+.relationship-card b {
+  font-size: 9px !important;
+  letter-spacing: 0.08em;
+}
+
+.system-claim-state.relationship-card small,
+.colonization-state.relationship-card small {
+  color: #98a3ba;
+}
+
+.colonization-state.relationship-card small {
+  display: block;
+  margin-top: 6px;
+  font-size: 10px;
+  line-height: 1.45;
+}
+
+.relationship-label {
+  border-color: rgba(var(--relation-rgb), 0.72);
+  background:
+    radial-gradient(circle at 100% 0%, rgba(var(--relation-rgb), 0.19), transparent 52%),
+    rgba(5, 8, 20, 0.9);
+  box-shadow:
+    0 0 25px rgba(var(--relation-rgb), 0.2),
+    0 10px 35px rgba(0, 0, 0, 0.42);
+}
+
+.relationship-label span {
+  color: var(--relation-accent);
+}
+
+.relationship-label.world-label--active {
+  border-color: rgba(255, 255, 255, 0.9);
+  box-shadow:
+    0 0 31px rgba(var(--relation-rgb), 0.3),
+    0 12px 38px rgba(0, 0, 0, 0.46);
+}
+
+.relationship-panel {
+  border-color: rgba(var(--relation-rgb), 0.4);
+  background:
+    radial-gradient(circle at 100% 0%, rgba(var(--relation-rgb), 0.2), transparent 42%),
+    linear-gradient(145deg, rgba(var(--relation-rgb), 0.1), rgba(5, 8, 20, 0.76));
+  box-shadow:
+    0 20px 60px rgba(0, 0, 0, 0.34),
+    0 0 38px rgba(var(--relation-rgb), 0.12),
+    inset 0 1px rgba(255, 255, 255, 0.045);
+}
+
+/* The player's own panel intentionally keeps the original blue glass style. */
+.relationship-panel--self {
+  border-color: var(--border);
+  background: linear-gradient(145deg, rgba(14, 20, 43, 0.82), rgba(5, 8, 20, 0.64));
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.28), inset 0 1px rgba(255, 255, 255, 0.04);
+}
+
+.relationship-panel:not(.relationship-panel--self) .panel-heading {
+  border-bottom-color: rgba(var(--relation-rgb), 0.22);
+}
+
+.relationship-panel:not(.relationship-panel--self) .panel-heading span,
+.relationship-panel:not(.relationship-panel--self) .surface-card > span,
+.relationship-panel:not(.relationship-panel--self) .production-panel__heading > span,
+.relationship-panel:not(.relationship-panel--self) .moon-roster > span {
+  color: var(--relation-accent);
+}
+
+.relationship-panel:not(.relationship-panel--self) .fact-grid div,
+.relationship-panel:not(.relationship-panel--self) .moon-roster,
+.relationship-panel:not(.relationship-panel--self) .production-panel {
+  border-color: rgba(var(--relation-rgb), 0.18);
+  background: rgba(var(--relation-rgb), 0.045);
+}
+
+.relationship-panel:not(.relationship-panel--self) .surface-card {
+  border-left-color: var(--relation-accent);
+  background: linear-gradient(90deg, rgba(var(--relation-rgb), 0.12), transparent);
+}
+
+.relationship-panel:not(.relationship-panel--self)::-webkit-scrollbar-thumb {
+  background: rgba(var(--relation-rgb), 0.42);
+}
