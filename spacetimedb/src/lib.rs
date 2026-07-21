@@ -1,15 +1,24 @@
+use serde::Deserialize;
 use spacetimedb::{Identity, ProcedureContext, ReducerContext, SpacetimeType, Table};
 
 const BETTER_AUTH_ISSUER: &str = "http://localhost:3005/api/auth";
 const BETTER_AUTH_CLIENT_ID: &str = "perseus-browser";
 
+#[derive(Debug, Deserialize)]
+struct BetterAuthClaims {
+    username: Option<String>,
+}
+
 #[spacetimedb::table(accessor = player)]
 pub struct Player {
     #[primary_key]
     pub identity: Identity,
-    pub auth_subject: String,
-}
 
+    pub auth_issuer: String,
+    pub auth_subject: String,
+
+    pub username: String,
+}
 #[spacetimedb::table(accessor = person, public)]
 pub struct Person {
     name: String,
@@ -99,38 +108,91 @@ pub fn init(ctx: &ReducerContext) {
 }
 
 #[spacetimedb::reducer(client_connected)]
-pub fn identity_connected(ctx: &ReducerContext) -> Result<(), String> {
-    let jwt = ctx
-        .sender_auth()
-        .jwt()
-        .ok_or_else(|| "Authentication required".to_string())?;
+pub fn identity_connected(
+    ctx: &ReducerContext,
+) -> Result<(), String> {
+    let Some(jwt) = ctx.sender_auth().jwt() else {
+        // Preserve ordinary SpacetimeDB CLI/server-issued connections.
+        return Ok(());
+    };
 
+    // Non-Better-Auth clients may connect, but do not become players.
     if jwt.issuer() != BETTER_AUTH_ISSUER {
-        return Err("Invalid authentication issuer".to_string());
+        return Ok(());
     }
 
     if !jwt
         .audience()
         .iter()
-        .any(|audience| audience == BETTER_AUTH_CLIENT_ID)
+        .any(|aud| aud == BETTER_AUTH_CLIENT_ID)
     {
-        return Err("Invalid authentication audience".to_string());
+        return Err("Invalid Better Auth audience".to_string());
     }
 
-    if ctx.db.player().identity().find(ctx.sender()).is_none() {
-        ctx.db.player().insert(Player {
-            identity: ctx.sender(),
-            auth_subject: jwt.subject().to_string(),
-        });
+    let claims: BetterAuthClaims =
+        serde_json::from_slice(jwt.raw_payload().as_bytes())
+            .map_err(|error| {
+                format!("Invalid Better Auth claims: {error}")
+            })?;
+
+    let username = claims
+        .username
+        .filter(|value| !value.trim().is_empty())
+        .ok_or_else(|| {
+            "Better Auth token does not contain a username".to_string()
+        })?;
+
+    let identity = ctx.sender();
+
+    match ctx.db.player().identity().find(identity) {
+        Some(mut player) => {
+            // Keep the SpacetimeDB profile synchronized if the
+            // username changes in Better Auth.
+            player.username = username;
+            player.auth_issuer = jwt.issuer().to_string();
+            player.auth_subject = jwt.subject().to_string();
+
+            ctx.db.player().identity().update(player);
+        }
+
+        None => {
+            ctx.db.player().insert(Player {
+                identity,
+                auth_issuer: jwt.issuer().to_string(),
+                auth_subject: jwt.subject().to_string(),
+                username,
+            });
+        }
     }
 
-    log::info!(
-        "Authenticated player connected: {:?} ({})",
-        ctx.sender(),
-        jwt.subject()
-    );
     Ok(())
 }
+
+
+fn require_player_auth(
+    ctx: &ReducerContext,
+) -> Result<(), String> {
+    let jwt = ctx
+        .sender_auth()
+        .jwt()
+        .ok_or_else(|| "Better Auth login required".to_string())?;
+
+    if jwt.issuer() != BETTER_AUTH_ISSUER {
+        return Err("Better Auth login required".to_string());
+    }
+
+    if !jwt
+        .audience()
+        .iter()
+        .any(|aud| aud == BETTER_AUTH_CLIENT_ID)
+    {
+        return Err("Invalid Better Auth audience".to_string());
+    }
+
+    Ok(())
+}
+
+
 
 #[spacetimedb::reducer]
 pub fn close_in(ctx: &ReducerContext) {

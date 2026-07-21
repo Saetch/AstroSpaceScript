@@ -40,10 +40,14 @@ export const auth = betterAuth({
       },
     }),
     oauthProvider({
-      loginPage: WEB_ORIGIN,
-      consentPage: WEB_ORIGIN,
-      scopes: ["openid", "profile"],
-      cachedTrustedClients: new Set([OAUTH_CLIENT_ID]),
+      loginPage: "http://localhost:5173/login",
+      consentPage: "http://localhost:5173/consent",
+
+      scopes: ["openid", "profile", "email"],
+
+      customIdTokenClaims: ({ user }) => ({
+        username: user.username ?? user.name,
+      }),
     }),
   ],
 });

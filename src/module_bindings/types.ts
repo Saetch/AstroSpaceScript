@@ -43,7 +43,9 @@ export type Person = __Infer<typeof Person>;
 
 export const Player = __t.object("Player", {
   identity: __t.identity(),
+  authIssuer: __t.string(),
   authSubject: __t.string(),
+  username: __t.string(),
 });
 export type Player = __Infer<typeof Player>;
 

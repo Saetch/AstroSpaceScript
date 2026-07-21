@@ -1,10 +1,11 @@
-import { StrictMode, useMemo } from "react";
+import { StrictMode, useMemo, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { Identity } from "spacetimedb";
 import { SpacetimeDBProvider } from "spacetimedb/react";
 
 import App from "./App";
 import { AuthScreen } from "./AuthScreen";
+import { AuthTopBar } from "./AuthTopBar";
 import {
   authClient,
   clearStoredIdToken,
@@ -22,6 +23,8 @@ const HOST = import.meta.env.VITE_SPACETIMEDB_HOST ?? "ws://localhost:3003";
 const DB_NAME = import.meta.env.VITE_SPACETIMEDB_DB_NAME ?? "rust-project";
 
 function AuthenticatedGame({ token }: { token: string }) {
+  const [loggingOut, setLoggingOut] = useState(false);
+
   const connectionBuilder = useMemo(
     () =>
       DbConnection.builder()
@@ -42,21 +45,30 @@ function AuthenticatedGame({ token }: { token: string }) {
   );
 
   async function logout() {
-    await authClient.signOut();
-    clearStoredIdToken();
-    window.location.assign("/");
+    setLoggingOut(true);
+
+    try {
+      await authClient.signOut();
+    } finally {
+      clearStoredIdToken();
+      window.location.assign("/");
+    }
   }
 
   return (
     <SpacetimeDBProvider connectionBuilder={connectionBuilder}>
-      <div className="auth-userbar">
-        <span>{getPlayerName(token)}</span>
-        <button type="button" onClick={logout}>
-          Logout
-        </button>
+      <div className="auth-app-shell">
+        <AuthTopBar
+          playerName={getPlayerName(token)}
+          loggingOut={loggingOut}
+          onLogout={logout}
+        />
+
+        <main className="auth-game-area">
+          <UniverseSpaceTimeBridge />
+          <App />
+        </main>
       </div>
-      <UniverseSpaceTimeBridge />
-      <App />
     </SpacetimeDBProvider>
   );
 }
