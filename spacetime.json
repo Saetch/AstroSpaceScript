@@ -1,6 +1,6 @@
 {
   "dev": {
-    "run": "npm run dev"
+    "run": "npm run dev:services"
   },
   "database": "rust-project",
   "server": "http://localhost:3003",

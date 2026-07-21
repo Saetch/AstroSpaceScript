@@ -5,12 +5,15 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "dev:auth": "npm --prefix auth-server run dev",
+    "dev:services": "concurrently --kill-others --names frontend,auth \"npm run dev\" \"npm run dev:auth\"",
     "build": "tsc -b && vite build",
     "preview": "vite preview"
   },
   "dependencies": {
     "@react-three/drei": "10.7.7",
     "@react-three/fiber": "9.6.1",
+    "better-auth": "^1.6.23",
     "react": "19.2.7",
     "react-dom": "19.2.7",
     "spacetimedb": "^2.6.1",
@@ -21,6 +24,7 @@
     "@types/react-dom": "19.2.3",
     "@types/three": "0.185.1",
     "@vitejs/plugin-react": "6.0.3",
+    "concurrently": "^10.0.3",
     "typescript": "7.0.2",
     "vite": "8.1.4"
   }

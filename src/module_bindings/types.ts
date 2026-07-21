@@ -41,6 +41,12 @@ export const Person = __t.object("Person", {
 });
 export type Person = __Infer<typeof Person>;
 
+export const Player = __t.object("Player", {
+  identity: __t.identity(),
+  authSubject: __t.string(),
+});
+export type Player = __Infer<typeof Player>;
+
 export const Vec3 = __t.object("Vec3", {
   x: __t.f32(),
   y: __t.f32(),

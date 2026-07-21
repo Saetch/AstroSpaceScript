@@ -1,0 +1,4 @@
+node_modules/
+auth.sqlite
+auth.sqlite-*
+.env

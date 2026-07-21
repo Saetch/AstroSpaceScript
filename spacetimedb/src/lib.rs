@@ -1,6 +1,14 @@
-use std::error::Error;
-use spacetimedb::{ProcedureContext, ReducerContext, SpacetimeType, Table};
-use serde::Deserialize;
+use spacetimedb::{Identity, ProcedureContext, ReducerContext, SpacetimeType, Table};
+
+const BETTER_AUTH_ISSUER: &str = "http://localhost:3005/api/auth";
+const BETTER_AUTH_CLIENT_ID: &str = "perseus-browser";
+
+#[spacetimedb::table(accessor = player)]
+pub struct Player {
+    #[primary_key]
+    pub identity: Identity,
+    pub auth_subject: String,
+}
 
 #[spacetimedb::table(accessor = person, public)]
 pub struct Person {
@@ -27,10 +35,11 @@ pub struct Galaxy {
     arm_count: Option<u16>,
     arm_winding: Option<f32>,
     companions: Option<String>,
-    home: Option<bool>
+    home: Option<bool>,
 }
+
 #[derive(Debug, SpacetimeType)]
-struct Vec3{
+struct Vec3 {
     x: f32,
     y: f32,
     z: f32,
@@ -41,7 +50,11 @@ pub fn init(ctx: &ReducerContext) {
     ctx.db.galaxy().insert(Galaxy {
         id: "perseus-ledger".to_string(),
         name: "The Perseus Ledger".to_string(),
-        position: Vec3 {x:0.0, y:0.0, z:0.0},
+        position: Vec3 {
+            x: 0.0,
+            y: 0.0,
+            z: 0.0,
+        },
         radius: 128.0,
         thickness: 10.0,
         rotation: -0.18,
@@ -59,11 +72,14 @@ pub fn init(ctx: &ReducerContext) {
         home: Some(true),
     });
 
-
     ctx.db.galaxy().insert(Galaxy {
         id: "perseus-destroyer".to_string(),
         name: "The Perseus Destroyer".to_string(),
-        position: Vec3 {x:600.0, y:10.0, z:200.0},
+        position: Vec3 {
+            x: 600.0,
+            y: 10.0,
+            z: 200.0,
+        },
         radius: 368.0,
         thickness: 40.0,
         rotation: -0.68,
@@ -83,31 +99,62 @@ pub fn init(ctx: &ReducerContext) {
 }
 
 #[spacetimedb::reducer(client_connected)]
-pub fn identity_connected(_ctx: &ReducerContext) {
-    // Called everytime a new client connects
+pub fn identity_connected(ctx: &ReducerContext) -> Result<(), String> {
+    let jwt = ctx
+        .sender_auth()
+        .jwt()
+        .ok_or_else(|| "Authentication required".to_string())?;
+
+    if jwt.issuer() != BETTER_AUTH_ISSUER {
+        return Err("Invalid authentication issuer".to_string());
+    }
+
+    if !jwt
+        .audience()
+        .iter()
+        .any(|audience| audience == BETTER_AUTH_CLIENT_ID)
+    {
+        return Err("Invalid authentication audience".to_string());
+    }
+
+    if ctx.db.player().identity().find(ctx.sender()).is_none() {
+        ctx.db.player().insert(Player {
+            identity: ctx.sender(),
+            auth_subject: jwt.subject().to_string(),
+        });
+    }
+
+    log::info!(
+        "Authenticated player connected: {:?} ({})",
+        ctx.sender(),
+        jwt.subject()
+    );
+    Ok(())
 }
 
 #[spacetimedb::reducer]
-pub fn close_in(ctx: &ReducerContext){
+pub fn close_in(ctx: &ReducerContext) {
     log::info!("Closing in...");
-    ctx.db.galaxy().iter().filter(|g| g.id == "perseus-destroyer").for_each(|mut g| {
-        g.position.x -= 60.0;
-        g.position.z -= 20.0;
-        log::info!("Position: {:?}", g.position.x);
-
-        ctx.db.galaxy().id().update(g);
-    })
+    ctx.db
+        .galaxy()
+        .iter()
+        .filter(|g| g.id == "perseus-destroyer")
+        .for_each(|mut g| {
+            g.position.x -= 60.0;
+            g.position.z -= 20.0;
+            log::info!("Position: {:?}", g.position.x);
+            ctx.db.galaxy().id().update(g);
+        });
 }
 
 #[spacetimedb::reducer(client_disconnected)]
-pub fn identity_disconnected(_ctx: &ReducerContext) {
-    // Called everytime a client disconnects
-}
+pub fn identity_disconnected(_ctx: &ReducerContext) {}
 
 #[spacetimedb::reducer]
 pub fn add(ctx: &ReducerContext, name: u64) {
-    let name = name.to_string();
-    ctx.db.person().insert(Person { name });
+    ctx.db.person().insert(Person {
+        name: name.to_string(),
+    });
 }
 
 #[spacetimedb::procedure]
