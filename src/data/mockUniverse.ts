@@ -1,4 +1,4 @@
-import type { Galaxy, Moon, StarSystem, TrafficRoute } from '../domain/universe'
+import type { Galaxy, Moon, PlayerOwnership, StarSystem, TrafficRoute } from '../domain/universe'
 
 
 function mockOrbitInclination(id: string) {
@@ -34,6 +34,12 @@ function mockMoon(
     color,
     secondaryColor,
   }
+}
+
+const currentPlayerOwner: PlayerOwnership = { isCurrentPlayer: true }
+
+function otherPlayerOwner(playerId: string, playerName: string): PlayerOwnership {
+  return { playerId, playerName }
 }
 
 export const mockGalaxies: Galaxy[] = [
@@ -152,6 +158,7 @@ const mockSystemDefinitions: StarSystem[] = [
     zoneRadius: 42,
     zoneStrength: 1.35,
     zoneName: 'Atlas Compact',
+    owner: currentPlayerOwner,
     description: 'The cradle system and the best-charted region of human space.',
     faction: 'Terran Assembly',
     population: '18.4 billion',
@@ -259,6 +266,7 @@ const mockSystemDefinitions: StarSystem[] = [
     zoneRadius: 38,
     zoneStrength: 1.05,
     zoneName: 'Atlas Compact',
+    owner: otherPlayerOwner('player-astra-vale', 'AstraVale'),
     description: 'A frontier system split between survey guilds and independent habitats.',
     faction: 'Free Navigators',
     population: '640 million',
@@ -363,6 +371,7 @@ const mockSystemDefinitions: StarSystem[] = [
     zoneRadius: 36,
     zoneStrength: 0.92,
     zoneName: 'Atlas Compact',
+    owner: otherPlayerOwner('player-orion-jack', 'OrionJack'),
     description: 'A brilliant high-energy star with wealthy orbital polities.',
     faction: 'Crown Compact',
     population: '3.1 billion',
@@ -465,6 +474,7 @@ const mockSystemDefinitions: StarSystem[] = [
     zoneRadius: 34,
     zoneStrength: 0.78,
     zoneName: 'Atlas Compact',
+    owner: currentPlayerOwner,
     description: 'A dim research preserve built around an ancient stellar observatory.',
     faction: 'Neutral Science Directorate',
     population: '42 million',
@@ -565,6 +575,7 @@ const mockSystemDefinitions: StarSystem[] = [
     zoneRadius: 44,
     zoneStrength: 1.08,
     zoneName: 'Atlas Compact',
+    owner: otherPlayerOwner('player-lyra-m', 'LyraM'),
     description: 'A prosperous six-world system extending the Compact eastward along the local spiral arm.',
     faction: 'Asterion Development League',
     population: '6.8 billion',

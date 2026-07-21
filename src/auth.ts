@@ -216,6 +216,10 @@ export function getPlayerName(token: string): string {
   return payload?.name ?? payload?.sub ?? "player";
 }
 
+export function getPlayerId(token: string): string | undefined {
+  return decodeJwt(token)?.sub;
+}
+
 export function clearStoredIdToken(): void {
   localStorage.removeItem(TOKEN_KEY);
   sessionStorage.removeItem(PKCE_VERIFIER_KEY);

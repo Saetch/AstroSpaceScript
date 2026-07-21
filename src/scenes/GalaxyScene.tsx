@@ -3,10 +3,11 @@ import { ThreeEvent, useFrame, useThree } from '@react-three/fiber'
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib'
 import * as THREE from 'three'
-import type { Galaxy, StarSystem, TrafficRoute } from '../domain/universe'
+import type { Galaxy, PlayerIdentity, StarSystem, TrafficRoute } from '../domain/universe'
 import { buildGalaxyInteractionStreams, buildGalaxyPointGeometry, galaxyGroupExtent, getGalaxyBodies } from '../procedural/galaxyGeometry'
 import { getSystemPrimaryColor, getSystemPrimaryRadius, isBlackHoleSystem, isGalacticCoreSystem, SystemPrimaryVisual } from '../components/SystemPrimary'
 import { GalaxyTrafficRoutes } from '../components/GalaxyTrafficRoutes'
+import { ownershipKey, resolveOwnership, systemOwnershipLabel } from '../domain/ownership'
 
 const GALAXY_WORLD_SCALE = 4
 const BASE_GALAXY_RADIUS = 600
@@ -99,7 +100,8 @@ function buildTerritoryGroups(systems: StarSystem[], positions: THREE.Vector3[])
   systems.forEach((system, index) => {
     if (!system.zoneColor || !system.zoneRadius) return
     const color = new THREE.Color(system.zoneColor)
-    const colorKey = `#${color.getHexString()}`
+    const visualColorKey = `#${color.getHexString()}`
+    const colorKey = `${visualColorKey}:${ownershipKey(system.owner)}`
     const source: TerritorySource = {
       systemId: system.id,
       position: positions[index],
@@ -505,17 +507,19 @@ function SystemInstances({ systems, positions, onOpenSystem, onHover }: {
   )
 }
 
-function SystemBeacon({ system, position, hovered, labelsVisible, onHover, onOpen }: {
+function SystemBeacon({ system, position, hovered, labelsVisible, currentPlayer, onHover, onOpen }: {
   system: StarSystem
   position: THREE.Vector3
   hovered: boolean
   labelsVisible: boolean
+  currentPlayer: PlayerIdentity
   onHover: (hovered: boolean) => void
   onOpen: () => void
 }) {
-  const colonized = system.planets.some((planet) => planet.colonized)
+  const ownership = resolveOwnership(system.owner, currentPlayer)
+  const claimed = ownership.relation !== 'unclaimed'
   const blackHole = isBlackHoleSystem(system)
-  const beaconColor = blackHole ? getSystemPrimaryColor(system) : colonized ? system.zoneColor ?? '#87dcff' : '#f3bb65'
+  const beaconColor = blackHole ? getSystemPrimaryColor(system) : claimed ? system.zoneColor ?? '#87dcff' : '#f3bb65'
 
   return (
     <group position={position.toArray()}
@@ -537,7 +541,7 @@ function SystemBeacon({ system, position, hovered, labelsVisible, onHover, onOpe
             <meshBasicMaterial color={beaconColor} transparent opacity={0.95} side={THREE.DoubleSide} toneMapped={false} depthTest={false} blending={THREE.AdditiveBlending} />
           </mesh>
         </group>
-      ) : !colonized && (
+      ) : !claimed && (
         <mesh rotation={[Math.PI / 2, 0, Math.PI / 4]} renderOrder={15}>
           <ringGeometry args={[7.2, 7.65, 4]} />
           <meshBasicMaterial color="#f3bb65" transparent opacity={hovered ? 0.95 : 0.68} side={THREE.DoubleSide} toneMapped={false} depthTest={false} />
@@ -549,9 +553,15 @@ function SystemBeacon({ system, position, hovered, labelsVisible, onHover, onOpe
       </mesh>
       {(labelsVisible || hovered) && (
         <Html center position={[0, 13, 0]} style={{ pointerEvents: 'none' }}>
-          <div className={`world-label system-label ${!colonized ? 'system-label--unclaimed' : ''} ${hovered ? 'world-label--active' : ''}`}>
+          <div className={`world-label system-label system-label--${ownership.relation} ${hovered ? 'world-label--active' : ''}`}>
             <strong>{system.name}</strong>
-            <span>{blackHole ? `BLACK HOLE · ${system.planets.length} orbiting worlds · click to visit` : colonized ? `${system.planets.length} charted worlds · click to visit` : `UNCLAIMED · ${system.planets.length} survey world · click to inspect`}</span>
+            <span>
+              {blackHole
+                ? `BLACK HOLE · ${systemOwnershipLabel(ownership)} · click to visit`
+                : ownership.relation === 'unclaimed'
+                  ? `UNCLAIMED · ${system.planets.length} survey worlds · click to inspect`
+                  : `${systemOwnershipLabel(ownership)} · ${system.planets.length} charted worlds · click to visit`}
+            </span>
           </div>
         </Html>
       )}
@@ -622,12 +632,13 @@ function ChartedRegion({ center, labelsVisible }: { center: THREE.Vector3; label
   )
 }
 
-export function GalaxyScene({ galaxy, systems, trafficRoutes, followRotation, resetOrientationToken, onLabelsVisibilityChange, onOpenSystem }: {
+export function GalaxyScene({ galaxy, systems, trafficRoutes, followRotation, resetOrientationToken, currentPlayer, onLabelsVisibilityChange, onOpenSystem }: {
   galaxy: Galaxy
   systems: StarSystem[]
   trafficRoutes: TrafficRoute[]
   followRotation: boolean
   resetOrientationToken: number
+  currentPlayer: PlayerIdentity
   onLabelsVisibilityChange?: (visible: boolean) => void
   onOpenSystem: (id: string) => void
 }) {
@@ -706,7 +717,8 @@ export function GalaxyScene({ galaxy, systems, trafficRoutes, followRotation, re
         <SystemInstances systems={navigableSystems} positions={positions} onOpenSystem={onOpenSystem} onHover={setHoveredIndex} />
         {navigableSystems.map((system, index) => (
           <SystemBeacon key={system.id} system={system} position={positions[index]} hovered={hoveredIndex === index}
-            labelsVisible={labelsVisible} onHover={(hovered) => setHoveredIndex(hovered ? index : undefined)}
+            labelsVisible={labelsVisible} currentPlayer={currentPlayer}
+            onHover={(hovered) => setHoveredIndex(hovered ? index : undefined)}
             onOpen={() => onOpenSystem(system.id)} />
         ))}
       </group>

@@ -10,6 +10,7 @@ import {
   authClient,
   clearStoredIdToken,
   finishOidcLogin,
+  getPlayerId,
   getPlayerName,
   getStoredIdToken,
 } from "./auth";
@@ -24,6 +25,10 @@ const DB_NAME = import.meta.env.VITE_SPACETIMEDB_DB_NAME ?? "rust-project";
 
 function AuthenticatedGame({ token }: { token: string }) {
   const [loggingOut, setLoggingOut] = useState(false);
+  const currentPlayer = useMemo(() => ({
+    id: getPlayerId(token),
+    name: getPlayerName(token),
+  }), [token]);
 
   const connectionBuilder = useMemo(
     () =>
@@ -59,14 +64,14 @@ function AuthenticatedGame({ token }: { token: string }) {
     <SpacetimeDBProvider connectionBuilder={connectionBuilder}>
       <div className="auth-app-shell">
         <AuthTopBar
-          playerName={getPlayerName(token)}
+          playerName={currentPlayer.name}
           loggingOut={loggingOut}
           onLogout={logout}
         />
 
         <main className="auth-game-area">
           <UniverseSpaceTimeBridge />
-          <App />
+          <App currentPlayer={currentPlayer} />
         </main>
       </div>
     </SpacetimeDBProvider>

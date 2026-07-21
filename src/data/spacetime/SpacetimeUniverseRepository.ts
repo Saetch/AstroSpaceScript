@@ -1,4 +1,4 @@
-import type { UniverseSnapshot } from '../../domain/universe'
+import type { Galaxy, UniverseSnapshot } from '../../domain/universe'
 import type { UniverseListener, UniverseRepository } from '../UniverseRepository'
 
 export interface SpacetimeUniverseAdapter {
@@ -60,6 +60,15 @@ export class SpacetimeUniverseRepository implements UniverseRepository {
   disconnect = () => {
     this.adapter.disconnect()
     this.setSnapshot({ ...this.snapshot, connection: 'offline' })
+  }
+
+  setGalaxies = (galaxies: Galaxy[]) => {
+    this.setSnapshot({
+      ...this.snapshot,
+      galaxies,
+      connection: 'live',
+      updatedAt: new Date().toISOString(),
+    })
   }
 
   retainSystem = (systemId: string) => {

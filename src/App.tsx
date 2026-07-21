@@ -2,7 +2,7 @@ import { GizmoHelper, GizmoViewport, MapControls, OrbitControls } from '@react-t
 import { Canvas } from '@react-three/fiber'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { MOUSE, MathUtils } from 'three'
-import type { PlanetTemperatureProfile, SurfacePoint, ViewState } from './domain/universe'
+import type { PlanetTemperatureProfile, PlayerIdentity, SurfacePoint, ViewState } from './domain/universe'
 import { useUniverse } from './data/useUniverse'
 import { universeRepository } from './data/UniverseRepository'
 import { SceneEnvironment } from './components/SceneEnvironment'
@@ -12,6 +12,7 @@ import { PlanetScene } from './scenes/PlanetScene'
 import { SolarSystemScene } from './scenes/SolarSystemScene'
 import { buildPlanetSeedKey } from './procedural/planetSeed'
 import { getSystemPrimaryColor, getSystemPrimaryLabel, isBlackHoleSystem, isGalacticCoreSystem } from './components/SystemPrimary'
+import { ownershipKey, planetOwnershipLabel, resolveOwnership, resolvePlanetOwnership, systemOwnershipLabel, territoryOwnershipLabel } from './domain/ownership'
 
 const productionPresentation = [
   { key: 'industry', label: 'Industry', icon: 'IND' },
@@ -42,7 +43,7 @@ function connectionLabel(connection: ReturnType<typeof useUniverse>['connection'
   return 'Mock universe'
 }
 
-export default function App() {
+export default function App({ currentPlayer }: { currentPlayer: PlayerIdentity }) {
   const universe = useUniverse()
   const [view, setView] = useState<ViewState>({ type: 'universe' })
   const [selectedPoint, setSelectedPoint] = useState<SurfacePoint>()
@@ -81,7 +82,8 @@ export default function App() {
   )
   const systemIsCore = system ? isGalacticCoreSystem(system) : false
   const systemColonized = systemIsCore ? false : system?.planets.some((item) => item.colonized) ?? false
-  const systemClaimed = !systemIsCore && Boolean(system?.zoneColor && system?.zoneRadius)
+  const systemOwnership = system ? resolveOwnership(system.owner, currentPlayer) : undefined
+  const planetOwnership = planet && system ? resolvePlanetOwnership(planet, system, currentPlayer) : undefined
 
   useEffect(() => () => {
     if (transitionTimer.current !== undefined) window.clearTimeout(transitionTimer.current)
@@ -110,7 +112,8 @@ export default function App() {
 
     galaxySystems.forEach((item) => {
       if (!item.zoneColor || !item.zoneRadius) return
-      const key = item.zoneColor.toLowerCase()
+      const ownership = resolveOwnership(item.owner, currentPlayer)
+      const key = `${item.zoneColor.toLowerCase()}:${ownershipKey(item.owner)}`
       const current = groups.get(key)
       if (current) {
         current.systems += 1
@@ -119,7 +122,9 @@ export default function App() {
       } else {
         groups.set(key, {
           color: item.zoneColor,
-          name: item.zoneName ?? item.faction,
+          name: ownership.relation === 'unclaimed'
+            ? item.zoneName ?? item.faction
+            : territoryOwnershipLabel(ownership),
           systems: 1,
           strength: item.zoneStrength ?? 1,
           reach: item.zoneRadius,
@@ -128,7 +133,7 @@ export default function App() {
     })
 
     return [...groups.values()].sort((a, b) => b.strength - a.strength)
-  }, [galaxySystems])
+  }, [currentPlayer, galaxySystems])
 
   const systemCameraDistance = useMemo(() => {
     if (!system) return 42
@@ -243,6 +248,7 @@ export default function App() {
             resetOrientationToken={galaxyOrientationReset}
             onLabelsVisibilityChange={setGalaxyLabelsVisible}
             onOpenSystem={openSystem}
+            currentPlayer={currentPlayer}
           />
         )}
         {view.type === 'system' && system && <SolarSystemScene system={system} onOpenPlanet={openPlanet} />}
@@ -379,7 +385,13 @@ export default function App() {
             : view.type === 'galaxy'
               ? 'GALACTIC MAP'
               : view.type === 'system'
-                ? (systemIsCore ? 'GALACTIC CORE' : systemColonized ? 'SYSTEM ORRERY' : 'UNCLAIMED SYSTEM')
+                ? (systemIsCore
+                  ? 'GALACTIC CORE'
+                  : systemOwnership?.relation === 'self'
+                    ? 'YOUR SYSTEM'
+                    : systemOwnership?.relation === 'other'
+                      ? `${systemOwnership.playerName ?? 'PLAYER'} SYSTEM`.toUpperCase()
+                      : 'UNCLAIMED SYSTEM')
                 : 'PLANETARY SURVEY'}
         </span>
         <h1>
@@ -401,9 +413,11 @@ export default function App() {
               : view.type === 'system'
                 ? (systemIsCore
                   ? 'Inspect the supermassive singularity, its incandescent accretion flow, photon ring, and polar jets.'
-                  : systemColonized
-                    ? 'Select a world to open its seeded procedural survey view.'
-                    : 'No permanent population or territorial claim is registered here. Survey a candidate world to establish the first colony.')
+                  : systemOwnership?.relation === 'self'
+                    ? 'This system belongs to you. Select a world to open its seeded procedural survey view.'
+                    : systemOwnership?.relation === 'other'
+                      ? `Claimed by ${systemOwnership.playerName ?? 'another player'}. You may inspect its registered worlds and infrastructure.`
+                      : 'No permanent population or territorial claim is registered here. Survey a candidate world to establish the first colony.')
                 : 'Drag to orbit. City lights are population-driven and remain visible across the night side.'}
         </p>
       </section>
@@ -552,15 +566,29 @@ export default function App() {
                 <div className="system-list">
                   {galaxySystems.map((item) => {
                     const galacticCore = isGalacticCoreSystem(item)
-                    const colonized = item.planets.some((candidate) => candidate.colonized)
+                    const ownership = resolveOwnership(item.owner, currentPlayer)
+                    const ownershipLabel = systemOwnershipLabel(ownership)
+                    const ownershipClass = ownership.relation === 'self'
+                      ? 'system-list__self'
+                      : ownership.relation === 'other'
+                        ? 'system-list__other'
+                        : 'system-list__unclaimed'
                     return (
-                      <button key={item.id} className={galacticCore ? 'system-list__core' : !colonized ? 'system-list__unclaimed' : undefined} onClick={() => openSystem(item.id)}>
+                      <button key={item.id} className={galacticCore ? 'system-list__core' : ownershipClass} onClick={() => openSystem(item.id)}>
                         <span className="star-swatch" style={{ background: getSystemPrimaryColor(item) }} />
                         <span>
                           <strong>{item.name}</strong>
-                          <small>{galacticCore ? `${getSystemPrimaryLabel(item)} · galactic center` : isBlackHoleSystem(item) ? `${getSystemPrimaryLabel(item)} · ${colonized ? item.faction : 'unclaimed'}` : colonized ? item.faction : 'Unclaimed · colonization candidate'}</small>
+                          <small>
+                            {galacticCore
+                              ? `${getSystemPrimaryLabel(item)} · galactic center`
+                              : isBlackHoleSystem(item)
+                                ? `${getSystemPrimaryLabel(item)} · ${ownershipLabel}`
+                                : ownership.relation === 'unclaimed'
+                                  ? 'UNCLAIMED · colonization candidate'
+                                  : `${ownershipLabel} · ${item.faction}`}
+                          </small>
                         </span>
-                        <b>{galacticCore ? 'CORE' : colonized ? item.planets.length : 'OPEN'}</b>
+                        <b>{galacticCore ? 'CORE' : ownership.relation === 'self' ? 'YOURS' : ownership.relation === 'other' ? 'PLAYER' : 'OPEN'}</b>
                       </button>
                     )
                   })}
@@ -582,12 +610,13 @@ export default function App() {
                 <strong>{systemIsCore ? 'Galactic center' : systemColonized ? system.population : 'No residents'}</strong>
               </div>
               <p className="panel-copy">{system.description}</p>
-              <div className={`system-claim-state ${systemIsCore ? 'system-claim-state--core' : systemClaimed ? 'system-claim-state--claimed' : 'system-claim-state--open'}`}>
-                <span>{systemIsCore ? 'CORE CLASSIFICATION' : systemClaimed ? 'TERRITORIAL STATUS' : 'COLONIZATION STATUS'}</span>
-                <strong>{systemIsCore ? 'Supermassive central singularity' : systemClaimed ? (system.zoneName ?? system.faction) : 'Outside every registered territory'}</strong>
-                <small>{systemIsCore ? 'A backend-defined galactic landmark. It is selectable like a system, but is not colonizable.' : systemClaimed ? 'This system contributes influence to its merged territorial field.' : `${system.planets.filter((candidate) => !candidate.colonized).length} uncolonized world available for survey.`}</small>
+              <div className={`system-claim-state ${systemIsCore ? 'system-claim-state--core' : systemOwnership?.relation === 'self' ? 'system-claim-state--self' : systemOwnership?.relation === 'other' ? 'system-claim-state--other' : 'system-claim-state--open'}`}>
+                <span>{systemIsCore ? 'CORE CLASSIFICATION' : systemOwnership?.relation === 'self' ? 'YOUR SYSTEM' : systemOwnership?.relation === 'other' ? 'PLAYER CLAIM' : 'COLONIZATION STATUS'}</span>
+                <strong>{systemIsCore ? 'Supermassive central singularity' : systemOwnership?.relation === 'self' ? 'Your system' : systemOwnership?.relation === 'other' ? systemOwnership.playerName : 'Outside every registered territory'}</strong>
+                <small>{systemIsCore ? 'A backend-defined galactic landmark. It is selectable like a system, but is not colonizable.' : systemOwnership?.relation === 'self' ? `Owned by ${currentPlayer.name}. This system contributes influence to your territorial field.` : systemOwnership?.relation === 'other' ? `Owned by ${systemOwnership.playerName ?? 'another player'}. This system contributes influence to that player’s territorial field.` : `${system.planets.filter((candidate) => !candidate.colonized).length} uncolonized world available for survey.`}</small>
               </div>
               <dl className="fact-grid">
+                <div><dt>Owner</dt><dd>{systemIsCore ? 'Core registry' : systemOwnership?.relation === 'self' ? 'You' : systemOwnership?.relation === 'other' ? systemOwnership.playerName : 'Unclaimed'}</dd></div>
                 <div><dt>Authority</dt><dd>{systemIsCore ? 'Core registry' : systemColonized ? system.faction : 'None'}</dd></div>
                 <div><dt>Worlds</dt><dd>{system.planets.length}</dd></div>
                 <div><dt>Primary</dt><dd>{isBlackHoleSystem(system) ? 'Black hole' : 'Star'}</dd></div>
@@ -601,16 +630,19 @@ export default function App() {
               </dl>
               {system.planets.length > 0 ? (
                 <div className="system-list">
-                  {system.planets.map((item) => (
-                    <button key={item.id} onClick={() => openPlanet(item.id)}>
-                      <span className="planet-swatch" style={{ background: item.color }} />
-                      <span>
-                        <strong>{item.name}</strong>
-                        <small>{item.type}</small>
-                      </span>
-                      <b>↗</b>
-                    </button>
-                  ))}
+                  {system.planets.map((item) => {
+                    const ownership = resolvePlanetOwnership(item, system, currentPlayer)
+                    return (
+                      <button key={item.id} className={`planet-list__${ownership.relation}`} onClick={() => openPlanet(item.id)}>
+                        <span className="planet-swatch" style={{ background: item.color }} />
+                        <span>
+                          <strong>{item.name}</strong>
+                          <small>{item.type} · {planetOwnershipLabel(ownership)}</small>
+                        </span>
+                        <b>{ownership.relation === 'self' ? 'YOURS' : ownership.relation === 'other' ? 'CLAIMED' : 'OPEN'}</b>
+                      </button>
+                    )
+                  })}
                 </div>
               ) : systemIsCore ? (
                 <div className="core-warning-card">
@@ -639,13 +671,20 @@ export default function App() {
                 <div><dt>Sunward → darkside</dt><dd>{formatTemperature(planet.temperature.substellar)} → {formatTemperature(planet.temperature.antistellar)}</dd></div>
                 <div><dt>Discoverer</dt><dd>{planet.discoveredBy}</dd></div>
                 <div><dt>Population</dt><dd>{new Intl.NumberFormat('en', { notation: 'compact', maximumFractionDigits: 1 }).format(planet.population)}</dd></div>
+                <div><dt>Owner</dt><dd>{planetOwnership?.relation === 'self' ? 'You' : planetOwnership?.relation === 'other' ? planetOwnership.playerName : 'Unclaimed'}</dd></div>
                 <div><dt>Moons</dt><dd>{planet.moons?.length ?? 0}</dd></div>
                 <div><dt>Sites</dt><dd>{planet.surfacePoints.length}</dd></div>
                 <div><dt>Seed</dt><dd>{planetSeedKey ?? 'pending'}</dd></div>
               </dl>
-              <div className={`colonization-state ${planet.colonized ? 'colonization-state--active' : 'colonization-state--open'}`}>
-                <span>{planet.colonized ? 'COLONIZED WORLD' : 'UNCLAIMED WORLD'}</span>
-                <strong>{planet.colonized ? `${formatProduction(planet.population)} residents` : 'No permanent population'}</strong>
+              <div className={`colonization-state ${planetOwnership?.relation === 'self' ? 'colonization-state--self' : planetOwnership?.relation === 'other' ? 'colonization-state--other' : 'colonization-state--open'}`}>
+                <span>{planetOwnership ? planetOwnershipLabel(planetOwnership) : 'UNCLAIMED WORLD'}</span>
+                <strong>
+                  {planetOwnership?.relation === 'self'
+                    ? `${formatProduction(planet.population)} residents · Your world`
+                    : planetOwnership?.relation === 'other'
+                      ? `${planetOwnership.playerName} · ${formatProduction(planet.population)} residents`
+                      : 'No permanent population'}
+                </strong>
               </div>
 
               {planet.colonized && planet.production && (

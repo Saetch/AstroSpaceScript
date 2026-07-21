@@ -2,6 +2,21 @@ export type Vector3Tuple = [number, number, number]
 
 export type ConnectionState = 'mock' | 'connecting' | 'live' | 'offline'
 
+export interface PlayerIdentity {
+  /** Stable authenticated user id, such as the OIDC `sub` claim. */
+  id?: string
+  name: string
+}
+
+export interface PlayerOwnership {
+  /** Stable backend player id. Prefer this over comparing display names. */
+  playerId?: string
+  /** Last known display name for UI and offline snapshots. */
+  playerName?: string
+  /** Temporary mock/client hint until ownership is supplied by SpacetimeDB. */
+  isCurrentPlayer?: boolean
+}
+
 export type SystemPrimaryKind = 'star' | 'black-hole'
 export type SystemMapRole = 'standard' | 'galactic-core'
 
@@ -154,6 +169,8 @@ export interface Planet {
   temperature: PlanetTemperatureProfile
   population: number
   colonized: boolean
+  /** Player claim. Omit for an unclaimed world; a colonized world may inherit its system owner. */
+  owner?: PlayerOwnership
   /** Target exposed land coverage (0..1). Ocean worlds are visually clamped to 0..0.07. */
   landFraction?: number
   production?: PlanetProduction
@@ -185,6 +202,8 @@ export interface StarSystem {
   zoneRadius?: number
   zoneStrength?: number
   zoneName?: string
+  /** Player claim. Omit for an unclaimed system or non-player landmark. */
+  owner?: PlayerOwnership
   description: string
   faction: string
   population: string

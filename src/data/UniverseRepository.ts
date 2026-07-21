@@ -22,6 +22,7 @@ function colonizedPlanet(planet: Planet): Planet {
   return {
     ...planet,
     colonized: true,
+    owner: { isCurrentPlayer: true },
     population: Math.max(planet.population, 2500),
     production: planet.production ?? {
       unit: 't',
@@ -60,6 +61,7 @@ function colonizedSystem(system: StarSystem, planetId: string): StarSystem {
     zoneRadius: system.zoneRadius ?? 28,
     zoneStrength: system.zoneStrength ?? 0.24,
     zoneName: system.zoneName ?? 'Atlas Compact',
+    owner: system.owner ?? { isCurrentPlayer: true },
     faction: system.faction === 'Unclaimed' ? 'Atlas Compact Colony' : system.faction,
     population: system.population === '0' ? '2,500' : system.population,
     planets: system.planets.map((planet) => (planet.id === planetId ? colonizedPlanet(planet) : planet)),
