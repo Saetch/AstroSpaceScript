@@ -75,7 +75,7 @@ app.get("/health", (_req, res) => {
   res.json({ ok: true, issuer: ISSUER, clientId: OAUTH_CLIENT_ID });
 });
 
-app.listen(port, "127.0.0.1", () => {
+app.listen(port, "0.0.0.0", () => {
   console.log(`Better Auth: ${AUTH_ORIGIN}`);
   console.log(`OIDC issuer: ${ISSUER}`);
   console.log(`OAuth client: ${OAUTH_CLIENT_ID}`);
