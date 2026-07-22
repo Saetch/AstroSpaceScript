@@ -10,6 +10,12 @@ import {
   type Infer as __Infer,
 } from "spacetimedb";
 
+export const CloseInTick = __t.object("CloseInTick", {
+  scheduledId: __t.u64(),
+  scheduledAt: __t.scheduleAt(),
+});
+export type CloseInTick = __Infer<typeof CloseInTick>;
+
 export const Galaxy = __t.object("Galaxy", {
   id: __t.string(),
   name: __t.string(),
@@ -35,6 +41,12 @@ export const Galaxy = __t.object("Galaxy", {
   home: __t.option(__t.bool()),
 });
 export type Galaxy = __Infer<typeof Galaxy>;
+
+export const GameClock = __t.object("GameClock", {
+  id: __t.u8(),
+  lastTick: __t.timestamp(),
+});
+export type GameClock = __Infer<typeof GameClock>;
 
 export const Person = __t.object("Person", {
   name: __t.string(),

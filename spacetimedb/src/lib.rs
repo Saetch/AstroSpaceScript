@@ -1,6 +1,7 @@
 use serde::Deserialize;
-use spacetimedb::{Identity, ProcedureContext, ReducerContext, SpacetimeType, Table};
+use std::time::Duration;
 
+use spacetimedb::{Identity, ProcedureContext, ReducerContext, ScheduleAt, SpacetimeType, Table, Timestamp};
 const BETTER_AUTH_ISSUER: &str = "http://localhost:3005/api/auth";
 const BETTER_AUTH_CLIENT_ID: &str = "perseus-browser";
 
@@ -19,6 +20,15 @@ pub struct Player {
 
     pub username: String,
 }
+
+#[spacetimedb::table(accessor = game_clock)]
+pub struct GameClock {
+    #[primary_key]
+    pub id: u8,
+
+    last_tick: Timestamp,
+}
+
 #[spacetimedb::table(accessor = person, public)]
 pub struct Person {
     name: String,
@@ -45,6 +55,48 @@ pub struct Galaxy {
     arm_winding: Option<f32>,
     companions: Option<String>,
     home: Option<bool>,
+}
+
+#[spacetimedb::table(
+    accessor = close_in_tick,
+    scheduled(run_close_in_tick)
+)]
+pub struct CloseInTick {
+    #[primary_key]
+    #[auto_inc]
+    pub scheduled_id: u64,
+
+    scheduled_at: ScheduleAt,
+}
+
+#[spacetimedb::reducer]
+pub fn run_close_in_tick(
+    ctx: &ReducerContext,
+    _tick: CloseInTick,
+) {
+    let now = ctx.timestamp;
+
+    let Some(mut clock) =
+        ctx.db.game_clock().id().find(0)
+    else {
+        ctx.db.game_clock().insert(GameClock {
+            id: 0,
+            last_tick: now,
+        });
+
+        return;
+    };
+
+    let delta = now
+        .duration_since(clock.last_tick)
+        .unwrap_or_default();
+
+    let delta_seconds = delta.as_secs_f32();
+
+    clock.last_tick = now;
+    ctx.db.game_clock().id().update(clock);
+
+    apply_close_in(ctx, delta_seconds);
 }
 
 #[derive(Debug, SpacetimeType)]
@@ -105,6 +157,28 @@ pub fn init(ctx: &ReducerContext) {
         companions: None,
         home: Some(false),
     });
+
+    ensure_close_in_loop(ctx);
+
+}
+
+
+fn ensure_close_in_loop(ctx: &ReducerContext) {
+    if ctx.db.game_clock().id().find(0).is_none() {
+        ctx.db.game_clock().insert(GameClock {
+            id: 0,
+            last_tick: ctx.timestamp,
+        });
+    }
+
+    if ctx.db.close_in_tick().count() == 0 {
+        ctx.db.close_in_tick().insert(CloseInTick {
+            scheduled_id: 0,
+            scheduled_at: ScheduleAt::Interval(
+                Duration::from_millis(3).into(),
+            ),
+        });
+    }
 }
 
 #[spacetimedb::reducer(client_connected)]
@@ -194,19 +268,31 @@ fn require_player_auth(
 
 
 
-#[spacetimedb::reducer]
-pub fn close_in(ctx: &ReducerContext) {
-    log::info!("Closing in...");
-    ctx.db
+fn apply_close_in(
+    ctx: &ReducerContext,
+    delta_seconds: f32,
+) {
+    const X_SPEED: f32 = 1.20;
+    const Z_SPEED: f32 = 0.40;
+
+    if let Some(mut galaxy) = ctx
+        .db
         .galaxy()
-        .iter()
-        .filter(|g| g.id == "perseus-destroyer")
-        .for_each(|mut g| {
-            g.position.x -= 60.0;
-            g.position.z -= 20.0;
-            log::info!("Position: {:?}", g.position.x);
-            ctx.db.galaxy().id().update(g);
-        });
+        .id()
+        .find(String::from("perseus-destroyer"))
+    {
+        galaxy.position.x -= X_SPEED * delta_seconds;
+        galaxy.position.z -= Z_SPEED * delta_seconds;
+
+        log::info!(
+            "delta={:.3}s, position=({}, {})",
+            delta_seconds,
+            galaxy.position.x,
+            galaxy.position.z,
+        );
+
+        ctx.db.galaxy().id().update(galaxy);
+    }
 }
 
 #[spacetimedb::reducer(client_disconnected)]
