@@ -41,6 +41,9 @@ function AuthenticatedGame({ token }: { token: string }) {
             "Connected with authenticated identity:",
             identity.toHexString(),
           );
+          _conn.subscriptionBuilder().subscribe([
+            `SELECT g.* FROM Galaxy g JOIN GalaxyToPlayerVisibility v ON g.id = v.galaxy_id WHERE v.player_id = '${identity.toHexString()}'`
+          ]);
         })
         .onDisconnect(() => console.log("Disconnected from SpacetimeDB"))
         .onConnectError((_ctx: ErrorContext, error: Error) => {

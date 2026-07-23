@@ -42,6 +42,11 @@ export const Galaxy = __t.object("Galaxy", {
 });
 export type Galaxy = __Infer<typeof Galaxy>;
 
+export const GalaxyToPlayerVisibility = __t.object("GalaxyToPlayerVisibility", {
+  name: __t.string(),
+});
+export type GalaxyToPlayerVisibility = __Infer<typeof GalaxyToPlayerVisibility>;
+
 export const GameClock = __t.object("GameClock", {
   id: __t.u8(),
   lastTick: __t.timestamp(),

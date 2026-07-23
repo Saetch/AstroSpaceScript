@@ -57,6 +57,19 @@ pub struct Galaxy {
     home: Option<bool>,
 }
 
+#[spacetimedb::table(accessor = galaxy_to_player_visibility, public)]
+pub struct GalaxyToPlayerVisibility {
+    #[primary_key]
+    #[auto_inc]
+    pub id: u64,
+
+    #[index(btree)]
+    pub player_id: Identity,
+
+    #[index(btree)]
+    pub galaxy_id: String,
+}
+
 #[spacetimedb::table(
     accessor = close_in_tick,
     scheduled(run_close_in_tick)
