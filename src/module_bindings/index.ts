@@ -42,7 +42,7 @@ import * as CountProcedure from "./count_procedure";
 
 // Import all table schema definitions
 import GalaxyRow from "./galaxy_table";
-import GlaxyToPlayerVisibilityRow from "./glaxy_to_player_visibility_table";
+import GalaxyToPlayerVisibilityRow from "./galaxy_to_player_visibility_table";
 import PersonRow from "./person_table";
 
 /** Type-only namespace exports for generated type groups. */
@@ -60,13 +60,23 @@ const tablesSchema = __schema({
       { name: 'galaxy_id_key', constraint: 'unique', columns: ['id'] },
     ],
   }, GalaxyRow),
-  glaxy_to_player_visibility: __table({
-    name: 'glaxy_to_player_visibility',
+  galaxy_to_player_visibility: __table({
+    name: 'galaxy_to_player_visibility',
     indexes: [
+      { accessor: 'galaxy_id', name: 'galaxy_to_player_visibility_galaxy_id_idx_btree', algorithm: 'btree', columns: [
+        'galaxyId',
+      ] },
+      { accessor: 'id', name: 'galaxy_to_player_visibility_id_idx_btree', algorithm: 'btree', columns: [
+        'id',
+      ] },
+      { accessor: 'player_id', name: 'galaxy_to_player_visibility_player_id_idx_btree', algorithm: 'btree', columns: [
+        'playerId',
+      ] },
     ],
     constraints: [
+      { name: 'galaxy_to_player_visibility_id_key', constraint: 'unique', columns: ['id'] },
     ],
-  }, GlaxyToPlayerVisibilityRow),
+  }, GalaxyToPlayerVisibilityRow),
   person: __table({
     name: 'person',
     indexes: [
