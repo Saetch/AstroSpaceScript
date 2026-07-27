@@ -11,7 +11,7 @@
 
 use spacetimedb::Identity;
 
-#[spacetimedb::table(accessor = galaxy_to_player_visibility, public)]
+#[spacetimedb::table(accessor = galaxy_to_player_visibility)]
 pub struct GalaxyToPlayerVisibility {
     #[primary_key]
     #[auto_inc]

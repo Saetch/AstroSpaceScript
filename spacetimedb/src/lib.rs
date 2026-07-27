@@ -7,6 +7,7 @@ pub mod scheduled;
 pub mod tables;
 pub mod types;
 
+pub mod admin;
 pub mod views;
 #[cfg(test)]
 mod tests;

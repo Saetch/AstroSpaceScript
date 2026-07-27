@@ -25,7 +25,7 @@ pub struct Person {
     pub name: String,
 }
 
-#[spacetimedb::table(accessor = galaxy, public)]
+#[spacetimedb::table(accessor = galaxy)]
 pub struct Galaxy {
     #[primary_key]
     pub id: String,

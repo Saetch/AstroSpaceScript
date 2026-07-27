@@ -37,8 +37,8 @@ function convertToGalaxy(row: GalaxyRow): Galaxy {
 }
 
 export function UniverseSpaceTimeBridge(){
-    const [rows, isReady] = useTable(tables.galaxy)
-
+    const [rows, isReady] =
+        useTable(tables.visible_galaxies)
 
     const galaxies = useMemo(
         () => rows.map(row => {

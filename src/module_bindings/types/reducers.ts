@@ -7,8 +7,10 @@ import { type Infer as __Infer } from "spacetimedb";
 
 // Import all reducer arg schemas
 import AddReducer from "../add_reducer";
+import GrantGalaxyVisibilityToReducer from "../grant_galaxy_visibility_to_reducer";
 import SayHelloReducer from "../say_hello_reducer";
 
 export type AddParams = __Infer<typeof AddReducer>;
+export type GrantGalaxyVisibilityToParams = __Infer<typeof GrantGalaxyVisibilityToReducer>;
 export type SayHelloParams = __Infer<typeof SayHelloReducer>;
 

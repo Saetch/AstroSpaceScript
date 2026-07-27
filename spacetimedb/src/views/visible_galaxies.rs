@@ -5,7 +5,8 @@ use crate::tables::visibility_tables::galaxy_to_player_visibility__query;
 
 #[spacetimedb::view(
     accessor = visible_galaxies,
-    public
+    public,
+    primary_key = id
 )]
 pub fn visible_galaxies(
     ctx: &ViewContext,

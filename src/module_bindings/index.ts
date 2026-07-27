@@ -35,14 +35,13 @@ import {
 
 // Import all reducer arg schemas
 import AddReducer from "./add_reducer";
+import GrantGalaxyVisibilityToReducer from "./grant_galaxy_visibility_to_reducer";
 import SayHelloReducer from "./say_hello_reducer";
 
 // Import all procedure arg schemas
 import * as CountProcedure from "./count_procedure";
 
 // Import all table schema definitions
-import GalaxyRow from "./galaxy_table";
-import GalaxyToPlayerVisibilityRow from "./galaxy_to_player_visibility_table";
 import PersonRow from "./person_table";
 import VisibleGalaxiesRow from "./visible_galaxies_table";
 
@@ -50,34 +49,6 @@ import VisibleGalaxiesRow from "./visible_galaxies_table";
 
 /** The schema information for all tables in this module. This is defined the same was as the tables would have been defined in the server. */
 const tablesSchema = __schema({
-  galaxy: __table({
-    name: 'galaxy',
-    indexes: [
-      { accessor: 'id', name: 'galaxy_id_idx_btree', algorithm: 'btree', columns: [
-        'id',
-      ] },
-    ],
-    constraints: [
-      { name: 'galaxy_id_key', constraint: 'unique', columns: ['id'] },
-    ],
-  }, GalaxyRow),
-  galaxy_to_player_visibility: __table({
-    name: 'galaxy_to_player_visibility',
-    indexes: [
-      { accessor: 'galaxy_id', name: 'galaxy_to_player_visibility_galaxy_id_idx_btree', algorithm: 'btree', columns: [
-        'galaxyId',
-      ] },
-      { accessor: 'id', name: 'galaxy_to_player_visibility_id_idx_btree', algorithm: 'btree', columns: [
-        'id',
-      ] },
-      { accessor: 'player_id', name: 'galaxy_to_player_visibility_player_id_idx_btree', algorithm: 'btree', columns: [
-        'playerId',
-      ] },
-    ],
-    constraints: [
-      { name: 'galaxy_to_player_visibility_id_key', constraint: 'unique', columns: ['id'] },
-    ],
-  }, GalaxyToPlayerVisibilityRow),
   person: __table({
     name: 'person',
     indexes: [
@@ -97,6 +68,7 @@ const tablesSchema = __schema({
 /** The schema information for all reducers in this module. This is defined the same way as the reducers would have been defined in the server, except the body of the reducer is omitted in code generation. */
 const reducersSchema = __reducers(
   __reducerSchema("add", AddReducer),
+  __reducerSchema("grant_galaxy_visibility_to", GrantGalaxyVisibilityToReducer),
   __reducerSchema("say_hello", SayHelloReducer),
 );
 
