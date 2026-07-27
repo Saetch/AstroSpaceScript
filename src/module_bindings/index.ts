@@ -44,6 +44,7 @@ import * as CountProcedure from "./count_procedure";
 import GalaxyRow from "./galaxy_table";
 import GalaxyToPlayerVisibilityRow from "./galaxy_to_player_visibility_table";
 import PersonRow from "./person_table";
+import VisibleGalaxiesRow from "./visible_galaxies_table";
 
 /** Type-only namespace exports for generated type groups. */
 
@@ -84,6 +85,13 @@ const tablesSchema = __schema({
     constraints: [
     ],
   }, PersonRow),
+  visible_galaxies: __table({
+    name: 'visible_galaxies',
+    indexes: [
+    ],
+    constraints: [
+    ],
+  }, VisibleGalaxiesRow),
 });
 
 /** The schema information for all reducers in this module. This is defined the same way as the reducers would have been defined in the server, except the body of the reducer is omitted in code generation. */

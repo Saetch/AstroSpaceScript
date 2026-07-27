@@ -49,7 +49,7 @@ pub(crate) fn ensure_close_in_loop(ctx: &ReducerContext) {
     if ctx.db.close_in_tick().count() == 0 {
         ctx.db.close_in_tick().insert(CloseInTick {
             scheduled_id: 0,
-            scheduled_at: ScheduleAt::Interval(Duration::from_millis(300).into()),
+            scheduled_at: ScheduleAt::Interval(Duration::from_millis(15).into()),
         });
     }
 }
@@ -68,7 +68,7 @@ fn apply_close_in(ctx: &ReducerContext, delta_seconds: f32) {
         galaxy.position.z -= Z_SPEED * delta_seconds;
 
         log::info!(
-            "delta={:.3}s, position=({}, {})",
+            "delta={:.6}s, position=({}, {})",
             delta_seconds,
             galaxy.position.x,
             galaxy.position.z,
