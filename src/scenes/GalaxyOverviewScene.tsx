@@ -41,6 +41,10 @@ function GalaxyBody({ galaxy, body, hovered }: {
     return buildGalaxyPointGeometry(body, { count })
   }, [body])
 
+
+  useEffect(() => {
+    return () => geometry.dispose()
+  }, [geometry])
   return (
     <group
       position={body.offset}
@@ -134,7 +138,23 @@ function GalaxyBody({ galaxy, body, hovered }: {
 function GalaxyObject({ galaxy, onOpen }: { galaxy: Galaxy; onOpen: () => void }) {
   const root = useRef<THREE.Group>(null)
   const [hovered, setHovered] = useState(false)
-  const bodies = useMemo(() => getGalaxyBodies(galaxy), [galaxy])
+  const geometryKey = [
+    galaxy.id,
+    galaxy.radius,
+    galaxy.thickness,
+    galaxy.morphology,
+    galaxy.primaryColor,
+    galaxy.secondaryColor,
+    galaxy.seed,
+    galaxy.armCount,
+    galaxy.armWinding,
+    galaxy.barLength,
+  ].join('|')
+
+  const bodies = useMemo(
+      () => getGalaxyBodies(galaxy),
+      [geometryKey],
+  )
   const hitRadius = useMemo(() => galaxyGroupExtent(galaxy) * 1.25, [galaxy])
   useCursor(hovered)
 

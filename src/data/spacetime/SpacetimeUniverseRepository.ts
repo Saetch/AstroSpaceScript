@@ -62,14 +62,43 @@ export class SpacetimeUniverseRepository implements UniverseRepository {
     this.setSnapshot({ ...this.snapshot, connection: 'offline' })
   }
 
-  setGalaxies = (galaxies: Galaxy[]) => {
-    this.setSnapshot({
+  setGalaxies(galaxies: Galaxy[]): void {
+    const previousById = new Map(
+        this.snapshot.galaxies.map(galaxy => [
+          galaxy.id,
+          galaxy,
+        ]),
+    )
+
+    let changed =
+        galaxies.length !== this.snapshot.galaxies.length
+
+    const mergedGalaxies = galaxies.map(next => {
+      const previous = previousById.get(next.id)
+
+      if (previous && sameGalaxy(previous, next)) {
+        // Keep the exact same JavaScript object.
+        return previous
+      }
+
+      changed = true
+      return next
+    })
+
+    if (!changed) return
+
+    this.snapshot = {
       ...this.snapshot,
-      galaxies,
+      galaxies: mergedGalaxies,
       connection: 'live',
       updatedAt: new Date().toISOString(),
-    })
+    }
+
+    this.listeners.forEach(listener => listener())
   }
+
+
+
 
   retainSystem = (systemId: string) => {
     this.retainedSystemRefs.set(systemId, (this.retainedSystemRefs.get(systemId) ?? 0) + 1)
@@ -112,4 +141,44 @@ export class SpacetimeUniverseRepository implements UniverseRepository {
       : snapshot
     this.listeners.forEach((listener) => listener())
   }
+}
+
+
+function sameVector(
+    left?: readonly number[],
+    right?: readonly number[],
+) {
+  if (left === right) return true
+  if (!left || !right) return left === right
+
+  return (
+      left.length === right.length &&
+      left.every((value, index) => value === right[index])
+  )
+}
+
+function sameGalaxy(
+    previous: Galaxy,
+    next: Galaxy,
+): boolean {
+  return (
+      previous.id === next.id &&
+      previous.name === next.name &&
+      sameVector(previous.position, next.position) &&
+      sameVector(previous.inclination, next.inclination) &&
+      previous.radius === next.radius &&
+      previous.thickness === next.thickness &&
+      previous.rotation === next.rotation &&
+      previous.morphology === next.morphology &&
+      previous.primaryColor === next.primaryColor &&
+      previous.secondaryColor === next.secondaryColor &&
+      previous.description === next.description &&
+      previous.discoveredBy === next.discoveredBy &&
+      previous.estimatedSystems === next.estimatedSystems &&
+      previous.seed === next.seed &&
+      previous.armCount === next.armCount &&
+      previous.armWinding === next.armWinding &&
+      previous.barLength === next.barLength &&
+      previous.home === next.home
+  )
 }
