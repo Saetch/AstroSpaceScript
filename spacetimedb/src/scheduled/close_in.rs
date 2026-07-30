@@ -17,7 +17,11 @@ pub struct CloseInTick {
 }
 
 #[spacetimedb::reducer]
-pub fn run_close_in_tick(ctx: &ReducerContext, _tick: CloseInTick) {
+pub fn run_close_in_tick(ctx: &ReducerContext, _tick: CloseInTick) -> Result<(), String> {
+    if !ctx.sender_auth().is_internal() {
+        return Err("run_close_in_tick may only be called by the scheduler".into());
+    }
+
     let now = ctx.timestamp;
 
     let Some(mut clock) = ctx.db.game_clock().id().find(0) else {
@@ -26,16 +30,19 @@ pub fn run_close_in_tick(ctx: &ReducerContext, _tick: CloseInTick) {
             last_tick: now,
         });
 
-        return;
+        return Ok(());
     };
 
-    let delta = now.duration_since(clock.last_tick).unwrap_or_default();
-    let delta_seconds = delta.as_secs_f32();
+    let delta = now
+        .duration_since(clock.last_tick)
+        .unwrap_or_default();
 
     clock.last_tick = now;
     ctx.db.game_clock().id().update(clock);
 
-    apply_close_in(ctx, delta_seconds);
+    apply_close_in(ctx, delta.as_secs_f32());
+
+    Ok(())
 }
 
 pub(crate) fn ensure_close_in_loop(ctx: &ReducerContext) {
