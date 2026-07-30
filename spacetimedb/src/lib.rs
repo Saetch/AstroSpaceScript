@@ -11,3 +11,4 @@ pub mod admin;
 pub mod views;
 #[cfg(test)]
 mod tests;
+pub mod procedural;
