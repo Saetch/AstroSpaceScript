@@ -1,74 +1,261 @@
-use std::f32::consts::PI;
+use std::f32::consts::{PI, TAU};
 
-#[derive(Clone, Debug)]
-pub struct GalaxyPoints {
+#[derive(Clone, Copy, Debug)]
+pub struct GalaxyPoint2 {
     pub x: f32,
-    pub y: f32,
+    pub z: f32,
 }
 
-#[derive(Clone, Debug)]
-pub struct GalaxyPointDistributionOptions {
+#[derive(Clone, Copy, Debug)]
+pub struct SpiralSystemDistributionOptions {
     pub arm_count: u32,
     pub radius: f32,
     pub winding: f32,
-    pub seed: u32
+    pub rotation: f32,
+    pub seed: u32,
+
+    /// Minimum density between the spiral arms.
+    ///
+    /// 0.03 means inter-arm space has roughly 3% of the maximum
+    /// acceptance probability.
+    pub interarm_density: f32,
+
+    /// Angular arm width, in radians, near the galactic center.
+    pub arm_width_inner: f32,
+
+    /// Angular arm width, in radians, near the galaxy edge.
+    pub arm_width_outer: f32,
+
+    /// Exponent used for radial distribution.
+    ///
+    /// Values below 1.0 move more systems toward the outside.
+    pub radial_bias: f32,
+
+    /// Avoid placing many ordinary systems directly at the center.
+    pub min_radius_fraction: f32,
+
+    /// Additional radial noise as a fraction of the galaxy radius.
+    pub radial_jitter_fraction: f32,
 }
 
-struct SeededRandom {
+impl Default for SpiralSystemDistributionOptions {
+    fn default() -> Self {
+        Self {
+            arm_count: 4,
+            radius: 128.0,
+            winding: 1.7,
+            rotation: 0.0,
+            seed: 1,
+
+            interarm_density: 0.035,
+            arm_width_inner: 0.08,
+            arm_width_outer: 0.22,
+            radial_bias: 0.72,
+            min_radius_fraction: 0.06,
+            radial_jitter_fraction: 0.012,
+        }
+    }
+}
+
+fn mix_u32(mut value: u32) -> u32 {
+    value ^= value >> 16;
+    value = value.wrapping_mul(0x7feb_352d);
+    value ^= value >> 15;
+    value = value.wrapping_mul(0x846c_a68b);
+    value ^ (value >> 16)
+}
+
+/// Deterministic random value in [0, 1).
+///
+/// `salt` identifies the generated system.
+/// `channel` identifies one random decision within that system.
+fn random_01(seed: u32, salt: u32, channel: u32) -> f32 {
+    let value = seed
+        ^ salt.wrapping_mul(0x9e37_79b9)
+        ^ channel.wrapping_mul(0x85eb_ca6b);
+
+    mix_u32(value) as f32 / 4_294_967_296.0
+}
+
+fn gaussian_like(
     seed: u32,
+    salt: u32,
+    first_channel: u32,
+    samples: u32,
+) -> f32 {
+    let mut total = 0.0;
+
+    for index in 0..samples {
+        total += random_01(
+            seed,
+            salt,
+            first_channel.wrapping_add(index),
+        );
+    }
+
+    total - samples as f32 / 2.0
 }
 
-impl SeededRandom {
-    fn new(seed: u32) -> Self {
-        Self { seed }
+fn lerp(start: f32, end: f32, amount: f32) -> f32 {
+    start + (end - start) * amount
+}
+
+/// Returns the relative system density at a polar coordinate.
+///
+/// `progress` is radius / galaxy radius and should be in [0, 1].
+/// `angle` is in radians.
+pub fn spiral_density_at(
+    options: &SpiralSystemDistributionOptions,
+    progress: f32,
+    angle: f32,
+) -> f32 {
+    let progress = progress.clamp(0.0, 1.0);
+    let arm_count = options.arm_count.max(1) as f32;
+    let arm_spacing = TAU / arm_count;
+
+    // This is the center line of arm zero at the requested radius.
+    const MIN_ARM_WIDTH: f32 = 0.001;
+
+    let spiral_angle =
+        options.rotation + progress * PI * options.winding;
+
+    // Measure the angle relative to the nearest arm.
+    let phase = (angle - spiral_angle).rem_euclid(arm_spacing);
+    let distance_to_arm = phase.min(arm_spacing - phase);
+
+    let arm_width = lerp(
+        options.arm_width_inner,
+        options.arm_width_outer,
+        progress,
+    )
+        .max(MIN_ARM_WIDTH);
+
+    // Gaussian falloff away from the arm center.
+    let normalized_distance = distance_to_arm / arm_width;
+    let arm_visibility =
+        (-0.5 * normalized_distance * normalized_distance).exp();
+
+    let interarm = options.interarm_density.clamp(0.0, 1.0);
+
+    interarm + (1.0 - interarm) * arm_visibility
+}
+
+pub fn generate_spiral_system_point(
+    options: &SpiralSystemDistributionOptions,
+    salt: u32,
+) -> GalaxyPoint2 {
+    let radius = options.radius.max(0.0);
+
+    if radius == 0.0 {
+        return GalaxyPoint2 { x: 0.0, z: 0.0 };
     }
 
-    fn next_f32(&mut self) -> f32 {
-        self.state = self.state.wrapping_add(0x6d2b79f5);
+    let min_progress =
+        options.min_radius_fraction.clamp(0.01, 0.95);
 
-        let mut value = self.state;
-        value = (value ^ (value >> 15)).wrapping_mul(value | 1);
-        value ^= value.wrapping_add((value ^ (value >> 7)).wrapping_mul(value | 61));
+    // Rejection sampling:
+    //
+    // 1. Pick a candidate anywhere in the disc.
+    // 2. Calculate how visible/dense the spiral is there.
+    // 3. Accept according to that density.
+    for attempt in 0..64_u32 {
+        let channel = attempt * 8;
 
-        ((value ^ (value >> 14)) as f32) / (u32::MAX as f32 + 1.0)
-    }
+        let radial_random = random_01(
+            options.seed,
+            salt,
+            channel,
+        );
 
-    fn gaussian_like(&mut self, samples: usize) -> f32 {
-        let mut total = 0.0;
+        let progress = min_progress
+            + (1.0 - min_progress)
+            * radial_random.powf(
+            options.radial_bias.max(0.05),
+        );
 
-        for _ in 0..samples {
-            total += self.next_f32();
+        let angle =
+            random_01(options.seed, salt, channel + 1) * TAU;
+
+        let density =
+            spiral_density_at(options, progress, angle);
+
+        let acceptance =
+            random_01(options.seed, salt, channel + 2);
+
+        if acceptance > density {
+            continue;
         }
 
-        total - samples as f32 / 2.0
+        let radial_jitter = gaussian_like(
+            options.seed,
+            salt,
+            channel + 3,
+            4,
+        ) * options.radial_jitter_fraction
+            * radius
+            * (0.35 + progress * 0.65);
+
+        let final_radius =
+            (progress * radius + radial_jitter)
+                .clamp(0.0, radius);
+
+        return GalaxyPoint2 {
+            x: angle.cos() * final_radius,
+            z: angle.sin() * final_radius,
+        };
+    }
+
+    // Extremely unlikely fallback: place the system directly on an arm.
+    let progress = min_progress
+        + (1.0 - min_progress)
+        * random_01(options.seed, salt, 1000)
+        .powf(options.radial_bias.max(0.05));
+
+    let arm_count = options.arm_count.max(1);
+    let arm_spacing = TAU / arm_count as f32;
+
+    let arm_index = (
+        random_01(options.seed, salt, 1001)
+            * arm_count as f32
+    )
+        .floor() as u32;
+
+    let arm_width = lerp(
+        options.arm_width_inner,
+        options.arm_width_outer,
+        progress,
+    );
+
+    let angle_jitter = gaussian_like(
+        options.seed,
+        salt,
+        1002,
+        4,
+    ) * arm_width;
+
+    let angle = options.rotation
+        + arm_index as f32 * arm_spacing
+        + progress * PI * options.winding
+        + angle_jitter;
+
+    let final_radius = progress * radius;
+
+    GalaxyPoint2 {
+        x: angle.cos() * final_radius,
+        z: angle.sin() * final_radius,
     }
 }
 
-pub fn generate_spiral_point_2d(options: &GalaxyPointDistributionOptions, salt: u32) -> SpiralPoint2 {
-    let arm_count = options.arm_count.max(1);
-    let radius = options.radius.max(0.0);
-    let winding = options.winding;
-
-    let mut random = SeededRandom::new(options.seed ^ salt.wrapping_mul(0x9e3779b9));
-
-    // Bias outward slightly so the galaxy does not overfill the center.
-    let progress = random.next_f32().powf(0.66);
-
-    let base_radius = progress * radius;
-
-    let arm_index = (random.next_f32() * arm_count as f32).floor() as u16;
-    let arm_angle = arm_index as f32 * ((PI * 2.0) / arm_count as f32);
-
-    let spiral_angle = arm_angle + progress * PI * winding;
-
-    let angle_jitter = random.gaussian_like(4) * (0.1 + progress * 0.26) * arm_tightness;
-    let radius_jitter = random.gaussian_like(4) * radius * (0.008 + progress * 0.026) * arm_tightness;
-
-    let final_radius = (base_radius + radius_jitter).clamp(0.0, radius);
-    let final_angle = spiral_angle + angle_jitter + options.rotation;
-
-    GalaxyPoints {
-        x: final_angle.cos() * final_radius,
-        y: final_angle.sin() * final_radius,
-    }
+pub fn generate_spiral_system_points(
+    options: &SpiralSystemDistributionOptions,
+    count: usize,
+) -> Vec<GalaxyPoint2> {
+    (0..count)
+        .map(|index| {
+            generate_spiral_system_point(
+                options,
+                index as u32,
+            )
+        })
+        .collect()
 }
