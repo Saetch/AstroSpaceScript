@@ -26,6 +26,7 @@ pub struct Person {
 }
 
 #[spacetimedb::table(accessor = galaxy)]
+#[derive(Clone)]
 pub struct Galaxy {
     #[primary_key]
     pub id: String,
