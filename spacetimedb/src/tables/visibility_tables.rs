@@ -23,3 +23,29 @@ pub struct GalaxyToPlayerVisibility {
     #[index(btree)]
     pub galaxy_id: String,
 }
+
+#[spacetimedb::table(accessor = system_to_player_visibility)]
+pub struct SystemToPlayerVisibility {
+    #[primary_key]
+    #[auto_inc]
+    pub id: u64,
+
+    #[index(btree)]
+    pub player_id: Identity,
+
+    #[index(btree)]
+    pub star_system_id: String,
+}
+
+#[spacetimedb::table(accessor = planet_to_player_visibility)]
+pub struct PlanetToPlayerVisibility {
+    #[primary_key]
+    #[auto_inc]
+    pub id: u64,
+
+    #[index(btree)]
+    pub player_id: Identity,
+
+    #[index(btree)]
+    pub planet_id: String,
+}
