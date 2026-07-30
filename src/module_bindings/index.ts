@@ -44,6 +44,8 @@ import * as CountProcedure from "./count_procedure";
 // Import all table schema definitions
 import PersonRow from "./person_table";
 import VisibleGalaxiesRow from "./visible_galaxies_table";
+import VisibleGalaxiesV2Row from "./visible_galaxies_v_2_table";
+import VisibleGalaxiesV3Row from "./visible_galaxies_v_3_table";
 
 /** Type-only namespace exports for generated type groups. */
 
@@ -63,6 +65,20 @@ const tablesSchema = __schema({
     constraints: [
     ],
   }, VisibleGalaxiesRow),
+  visible_galaxies_v2: __table({
+    name: 'visible_galaxies_v_2',
+    indexes: [
+    ],
+    constraints: [
+    ],
+  }, VisibleGalaxiesV2Row),
+  visible_galaxies_v3: __table({
+    name: 'visible_galaxies_v_3',
+    indexes: [
+    ],
+    constraints: [
+    ],
+  }, VisibleGalaxiesV3Row),
 });
 
 /** The schema information for all reducers in this module. This is defined the same way as the reducers would have been defined in the server, except the body of the reducer is omitted in code generation. */

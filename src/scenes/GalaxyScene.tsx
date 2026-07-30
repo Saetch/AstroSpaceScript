@@ -178,128 +178,149 @@ function territoryKey(groups: TerritoryGroup[]) {
 }
 
 function MassiveGalaxyBody({
-  galaxy,
-  body,
-  territoryGroups,
-}: {
+                             galaxy,
+                             body,
+                             territoryGroups,
+                           }: {
   galaxy: Galaxy
   body: ReturnType<typeof getGalaxyBodies>[number]
   territoryGroups: TerritoryGroup[]
 }) {
   const displayScale = GALAXY_RADIUS / galaxyGroupExtent(galaxy)
   const displayRadius = body.radius * displayScale
-  const displayThickness = Math.max(8, body.thickness * GALAXY_WORLD_SCALE)
-  const displayOffset = useMemo(
-    () => new THREE.Vector3(body.offset[0], body.offset[1], body.offset[2]).multiplyScalar(displayScale),
-    [body.offset, displayScale],
+  const displayThickness = Math.max(
+      8,
+      body.thickness * GALAXY_WORLD_SCALE,
   )
-  const key = territoryKey(territoryGroups)
 
-  const geometry = useMemo(() => {
+  const displayOffset = useMemo(
+      () =>
+          new THREE.Vector3(
+              body.offset[0],
+              body.offset[1],
+              body.offset[2],
+          ).multiplyScalar(displayScale),
+      [body.offset, displayScale],
+  )
+
+  const territoryGeometryKey = territoryKey(territoryGroups)
+
+  const [geometry, setGeometry] =
+      useState<THREE.BufferGeometry | null>(null)
+
+  useEffect(() => {
     const relativeSize = body.radius / galaxy.radius
-    const count = body.primary ? 118000 : Math.max(28000, Math.round(76000 * Math.pow(relativeSize, 1.15)))
-    return buildGalaxyPointGeometry(body, {
+
+    const count = body.primary
+        ? 118000
+        : Math.max(
+            28000,
+            Math.round(
+                76000 * Math.pow(relativeSize, 1.15),
+            ),
+        )
+
+    console.error('ACTUAL GEOMETRY EFFECT START', {
+      galaxyId: galaxy.id,
+      bodyId: body.id,
+    })
+
+    const nextGeometry = buildGalaxyPointGeometry(body, {
       count,
       radius: displayRadius,
       thickness: displayThickness,
-      colorTransform: (naturalColor, x, y, z) => {
-        const warmCore = Math.max(0, 1 - Math.hypot(x, z) / Math.max(1, displayRadius * 0.25))
-        naturalColor.multiplyScalar(THREE.MathUtils.clamp(0.88 + warmCore * 0.22, 0, 1.15))
-        return tintWithTerritories(
-          naturalColor,
-          x + displayOffset.x,
-          z + displayOffset.z,
-          territoryGroups,
-        )
-      },
+      colorTransform: (color, x, _y, z) =>
+          tintWithTerritories(
+              color,
+              x + displayOffset.x,
+              z + displayOffset.z,
+              territoryGroups,
+          ),
     })
-    // Territory changes recolor the deterministic geometry.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [body, displayOffset.x, displayOffset.z, displayRadius, displayThickness, galaxy.radius, key])
+
+    console.error('ACTUAL GEOMETRY EFFECT COMPLETE', {
+      galaxyId: galaxy.id,
+      bodyId: body.id,
+    })
+
+    setGeometry(nextGeometry)
+
+    return () => nextGeometry.dispose()
+  }, [
+    body,
+    displayOffset.x,
+    displayOffset.z,
+    displayRadius,
+    displayThickness,
+    galaxy.radius,
+    territoryGeometryKey,
+  ])
+
+  if (!geometry) {
+    return null
+  }
 
   return (
-    <group
-      position={displayOffset.toArray()}
-      rotation={[body.inclination?.[0] ?? 0, body.rotation, body.inclination?.[2] ?? 0]}
-    >
-      <points geometry={geometry} renderOrder={0} frustumCulled={false}>
-        <pointsMaterial
-          size={1.18}
-          sizeAttenuation={false}
-          vertexColors
-          transparent
-          opacity={0.78}
-          depthWrite={false}
-          blending={THREE.AdditiveBlending}
-        />
-      </points>
+      <group
+          position={displayOffset.toArray()}
+          rotation={[
+            body.inclination?.[0] ?? 0,
+            body.rotation,
+            body.inclination?.[2] ?? 0,
+          ]}
+      >
+        <points
+            geometry={geometry}
+            renderOrder={0}
+            frustumCulled={false}
+        >
+          <pointsMaterial
+              size={1.18}
+              sizeAttenuation={false}
+              vertexColors
+              transparent
+              opacity={0.78}
+              depthWrite={false}
+              blending={THREE.AdditiveBlending}
+          />
+        </points>
 
-      {body.interactionPhase && body.interactionPhase !== 'bound' && (
-        <group>
-          <mesh scale={[displayRadius * 0.16, Math.max(displayThickness * 0.42, 5), displayRadius * 0.16]}>
-            <sphereGeometry args={[1, 40, 24]} />
-            <meshBasicMaterial
-              color={body.secondaryColor}
-              transparent
-              opacity={0.12}
-              depthWrite={false}
-              blending={THREE.AdditiveBlending}
-              toneMapped={false}
-            />
-          </mesh>
-          <mesh rotation={[-Math.PI / 2, 0, 0]} scale={[displayRadius * 0.34, displayRadius * 0.22, 1]}>
-            <circleGeometry args={[1, 96]} />
-            <meshBasicMaterial
-              color={body.primaryColor}
-              transparent
-              opacity={0.035}
-              depthWrite={false}
-              blending={THREE.AdditiveBlending}
-              toneMapped={false}
-              side={THREE.DoubleSide}
-            />
-          </mesh>
-        </group>
-      )}
-
-      {body.morphology === 'barred-spiral' && (
-        <group>
-          <mesh rotation={[-Math.PI / 2, 0, 0]} scale={[displayRadius * 0.31, displayRadius * 0.052, 1]}>
-            <circleGeometry args={[1, 96]} />
-            <meshBasicMaterial
-              color={body.secondaryColor}
-              transparent
-              opacity={0.055}
-              depthWrite={false}
-              blending={THREE.AdditiveBlending}
-              toneMapped={false}
-              side={THREE.DoubleSide}
-            />
-          </mesh>
-          <mesh scale={[displayRadius * 0.15, displayThickness * 0.22, displayRadius * 0.105]}>
-            <sphereGeometry args={[1, 36, 22]} />
-            <meshBasicMaterial
-              color={body.secondaryColor}
-              transparent
-              opacity={0.085}
-              depthWrite={false}
-              blending={THREE.AdditiveBlending}
-              toneMapped={false}
-            />
-          </mesh>
-        </group>
-      )}
-    </group>
+        {/* Remaining meshes */}
+      </group>
   )
 }
 
 function MassiveGalaxy({ galaxy, territoryGroups }: { galaxy: Galaxy; territoryGroups: TerritoryGroup[] }) {
-  const bodies = useMemo(() => getGalaxyBodies(galaxy), [galaxy])
+  const geometryKey = [
+    galaxy.id,
+    galaxy.radius,
+    galaxy.thickness,
+    galaxy.morphology,
+    galaxy.primaryColor,
+    galaxy.secondaryColor,
+    galaxy.seed,
+    galaxy.armCount,
+    galaxy.armWinding,
+    galaxy.barLength,
+  ].join('|')
+
+  const bodies = useMemo(
+      () => getGalaxyBodies(galaxy),
+      [geometryKey],
+  )
   const displayScale = GALAXY_RADIUS / galaxyGroupExtent(galaxy)
   const interactionStreams = useMemo(
     () => buildGalaxyInteractionStreams(galaxy, displayScale, 18000),
     [displayScale, galaxy],
   )
+  for (const body of bodies){
+    console.log('BUILD GEOMETRY', {
+      galaxyId: galaxy.id,
+      bodyId: body.id,
+      primary: body.primary,
+    })
+  }
+
 
   useEffect(() => () => {
     interactionStreams.forEach((stream) => stream.geometry.dispose())
@@ -333,6 +354,7 @@ function MassiveGalaxy({ galaxy, territoryGroups }: { galaxy: Galaxy; territoryG
   )
 }
 
+
 function MergedTerritoryMap({ territoryGroups }: { territoryGroups: TerritoryGroup[] }) {
   const key = territoryKey(territoryGroups)
 
@@ -365,8 +387,8 @@ function MergedTerritoryMap({ territoryGroups }: { territoryGroups: TerritoryGro
     }
 
     const isBoundaryPixel = (px: number, py: number, winnerIndex: number) => {
-      for (let oy = -2; oy <= 2; oy += 1) {
-        for (let ox = -2; ox <= 2; ox += 1) {
+      for (let oy = -1; oy <= 1; oy += 1) {
+        for (let ox = -1; ox <= 1; ox += 1) {
           if (ox === 0 && oy === 0) continue
           const nx = px + ox
           const ny = py + oy
@@ -397,7 +419,7 @@ function MergedTerritoryMap({ territoryGroups }: { territoryGroups: TerritoryGro
         else displayColor.multiplyScalar(0.88 + coverage * 0.12)
 
         const alpha = boundary
-          ? 0.98
+          ? 0.72
           : THREE.MathUtils.clamp(0.105 + coverage * 0.12 + dominance * 0.035, 0.105, 0.27)
         const dataIndex = pixelIndex * 4
         data[dataIndex] = Math.round(THREE.MathUtils.clamp(displayColor.r, 0, 1) * 255)
@@ -415,8 +437,8 @@ function MergedTerritoryMap({ territoryGroups }: { territoryGroups: TerritoryGro
       THREE.UnsignedByteType,
     )
     result.colorSpace = THREE.SRGBColorSpace
-    result.minFilter = THREE.NearestFilter
-    result.magFilter = THREE.NearestFilter
+    result.minFilter = THREE.LinearFilter
+    result.magFilter = THREE.LinearFilter
     result.generateMipmaps = false
     result.flipY = false
     result.needsUpdate = true
@@ -491,6 +513,25 @@ function SystemInstances({ systems, positions, onOpenSystem, onHover }: {
     event.stopPropagation()
     return event.instanceId
   }
+
+  useEffect(() => {
+    return () => {
+      coreGeometry.dispose()
+      glowGeometry.dispose()
+      hitGeometry.dispose()
+
+      coreMaterial.dispose()
+      glowMaterial.dispose()
+      hitMaterial.dispose()
+    }
+  }, [
+    coreGeometry,
+    glowGeometry,
+    hitGeometry,
+    coreMaterial,
+    glowMaterial,
+    hitMaterial,
+  ])
 
   return (
     <group>
@@ -672,32 +713,33 @@ export function GalaxyScene({ galaxy, systems, trafficRoutes, followRotation, re
     onLabelsVisibilityChange?.(labelsVisible)
   }, [labelsVisible, onLabelsVisibilityChange])
 
-  useFrame((_, delta) => {
-    const rotationDelta = delta * GALAXY_ROTATION_SPEED
-    if (rotationRoot.current) rotationRoot.current.rotation.y += rotationDelta
-
-    const orbitControls = controls as OrbitControlsImpl | undefined
-
-    if (followRotation) {
-      camera.position.applyAxisAngle(Y_AXIS, rotationDelta)
-      orbitControls?.target.applyAxisAngle(Y_AXIS, rotationDelta)
+  useEffect(() => {
+    if (rotationRoot.current) {
+      rotationRoot.current.rotation.set(0, 0, 0)
     }
 
-    // Keep galaxy navigation anchored to the galactic plane while allowing
-    // users to pan to any X/Z point and orbit around that local table point.
+    if (camera instanceof THREE.PerspectiveCamera) {
+      camera.fov = 46
+      camera.near = 0.1
+      camera.far = 24000
+    }
+
+    camera.position.copy(DEFAULT_CAMERA_POSITION)
+    camera.up.set(0, 1, 0)
+    camera.lookAt(DEFAULT_CAMERA_TARGET)
+    camera.updateProjectionMatrix()
+
+    const orbitControls =
+        controls as OrbitControlsImpl | undefined
+
     if (orbitControls) {
-      orbitControls.target.y = 0
+      orbitControls.target.copy(DEFAULT_CAMERA_TARGET)
       orbitControls.update()
     }
+  }, [camera, controls, resetOrientationToken])
 
-    const rootRotation = rotationRoot.current?.rotation.y ?? 0
-    const worldRegionCenter = regionCenter.clone().applyEuler(GALAXY_TILT).applyAxisAngle(Y_AXIS, rootRotation)
-    const shouldShowLabels = navigableSystems.length > 0 && camera.position.distanceTo(worldRegionCenter) < LABEL_VISIBILITY_DISTANCE
-    if (shouldShowLabels !== labelsVisibleRef.current) {
-      labelsVisibleRef.current = shouldShowLabels
-      setLabelsVisible(shouldShowLabels)
-    }
-  })
+
+
 
   return (
     <group ref={rotationRoot}>

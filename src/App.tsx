@@ -139,8 +139,10 @@ export default function App({ currentPlayer }: { currentPlayer: PlayerIdentity }
       }
     })
 
-    return [...groups.values()].sort((a, b) => b.strength - a.strength)
-  }, [currentPlayer, galaxySystems])
+    return [...groups.entries()].map(([id, territory]) => ({
+      id,
+      ...territory,
+    }))  }, [currentPlayer, galaxySystems])
 
   const systemCameraDistance = useMemo(() => {
     if (!system) return 42
@@ -237,10 +239,12 @@ export default function App({ currentPlayer }: { currentPlayer: PlayerIdentity }
   return (
     <main className="app-shell">
       <Canvas
-        key={`${view.type}-${galaxy?.id ?? 'catalog'}-${system?.id ?? 'root'}-${planet?.id ?? ''}`}
-        camera={camera}
-        dpr={[1, 1.75]}
-        gl={{ antialias: true, powerPreference: 'high-performance' }}
+          camera={camera}
+          dpr={[1, 1.75]}
+          gl={{
+            antialias: true,
+            powerPreference: 'high-performance',
+          }}
       >
         <SceneEnvironment mode={view.type} />
         {view.type === 'universe' && (
@@ -436,8 +440,10 @@ export default function App({ currentPlayer }: { currentPlayer: PlayerIdentity }
             <strong>{territorySummaries.length}</strong>
           </div>
           {territorySummaries.map((territory) => (
-            <div className="territory-overview__zone" key={territory.color}>
-              <i style={{ background: territory.color, boxShadow: `0 0 18px ${territory.color}` }} />
+              <div
+                  key={territory.id}
+                  className="territory-overview__zone"
+              >              <i style={{ background: territory.color, boxShadow: `0 0 18px ${territory.color}` }} />
               <span>
                 <strong>{territory.name}</strong>
                 <small>{territory.systems} anchors · {territory.strength.toFixed(1)} influence · {territory.reach} reach</small>
