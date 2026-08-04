@@ -27,7 +27,7 @@ fn system_visibility_exists(
         .any(|visibility| &visibility.player_id == player_id)
 }
 
-fn planet_visibility_exists(
+pub fn planet_visibility_exists(
     ctx: &ReducerContext,
     player_id: &Identity,
     planet_id: &str,

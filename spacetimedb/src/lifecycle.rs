@@ -1,7 +1,8 @@
 use spacetimedb::{ReducerContext, Table};
-
+use crate::admin;
 use crate::auth::{BetterAuthClaims, BETTER_AUTH_CLIENT_ID, BETTER_AUTH_ISSUER};
 use crate::tables::data_tables::*;
+use crate::tables::visibility_tables::galaxy_to_player_visibility;
 
 #[spacetimedb::reducer(client_connected)]
 pub fn identity_connected(ctx: &ReducerContext) -> Result<(), String> {
@@ -50,6 +51,7 @@ pub fn identity_connected(ctx: &ReducerContext) -> Result<(), String> {
                 auth_subject: jwt.subject().to_string(),
                 username,
             });
+            admin::reducers::grant_galaxy_visibility_to(ctx, identity, "perseus-ledger".to_string()).expect("TODO: panic message");
         }
     }
 

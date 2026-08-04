@@ -94,108 +94,108 @@ function LandSettlementFeature({ scale, selected, seed }: { scale: number; selec
   }, [scale, seed])
 
   return (
-    <group>
-      <mesh position={[0, scale * 0.022, 0]}>
-        <cylinderGeometry args={[scale * 0.92, scale * 1.02, scale * 0.045, 18]} />
-        <meshStandardMaterial color="#0a0f16" roughness={0.98} metalness={0.08} />
-      </mesh>
+      <group>
+        <mesh position={[0, scale * 0.022, 0]}>
+          <cylinderGeometry args={[scale * 0.92, scale * 1.02, scale * 0.045, 18]} />
+          <meshStandardMaterial color="#0a0f16" roughness={0.98} metalness={0.08} />
+        </mesh>
 
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, scale * 0.048, 0]}>
-        <ringGeometry args={[scale * 0.34, scale * 0.39, 36]} />
-        <meshStandardMaterial color="#1b222d" emissive="#8fb8d0" emissiveIntensity={0.045} roughness={0.82} />
-      </mesh>
+        <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, scale * 0.048, 0]}>
+          <ringGeometry args={[scale * 0.34, scale * 0.39, 36]} />
+          <meshStandardMaterial color="#1b222d" emissive="#8fb8d0" emissiveIntensity={0.045} roughness={0.82} />
+        </mesh>
 
-      {layout.districts.map((district) => (
-        <group key={`district-${district.id}`}>
-          <mesh
-            position={[district.x / 2, scale * 0.052, district.z / 2]}
-            rotation={[0, -district.rotation, 0]}
-          >
-            <boxGeometry args={[Math.hypot(district.x, district.z), scale * 0.018, scale * 0.045]} />
-            <meshStandardMaterial color="#1a2028" roughness={0.9} metalness={0.12} />
-          </mesh>
-          <mesh position={[district.x, scale * 0.056, district.z]} rotation={[-Math.PI / 2, 0, 0]}>
-            <ringGeometry args={[scale * 0.16, scale * 0.195, 24]} />
-            <meshStandardMaterial color="#202935" emissive="#557d93" emissiveIntensity={0.035} roughness={0.86} />
-          </mesh>
-        </group>
-      ))}
+        {layout.districts.map((district) => (
+            <group key={`district-${district.id}`}>
+              <mesh
+                  position={[district.x / 2, scale * 0.052, district.z / 2]}
+                  rotation={[0, -district.rotation, 0]}
+              >
+                <boxGeometry args={[Math.hypot(district.x, district.z), scale * 0.018, scale * 0.045]} />
+                <meshStandardMaterial color="#1a2028" roughness={0.9} metalness={0.12} />
+              </mesh>
+              <mesh position={[district.x, scale * 0.056, district.z]} rotation={[-Math.PI / 2, 0, 0]}>
+                <ringGeometry args={[scale * 0.16, scale * 0.195, 24]} />
+                <meshStandardMaterial color="#202935" emissive="#557d93" emissiveIntensity={0.035} roughness={0.86} />
+              </mesh>
+            </group>
+        ))}
 
-      {layout.buildings.map((building) => (
-        <group key={building.id} position={[building.x, scale * 0.06, building.z]} rotation={[0, building.rotation, 0]}>
-          <mesh position={[0, building.height / 2, 0]}>
-            {building.shape === 'round' ? (
-              <cylinderGeometry args={[building.width * 0.52, building.width * 0.62, building.height, 8]} />
-            ) : (
-              <boxGeometry args={[building.width, building.height, building.depth]} />
-            )}
-            <meshStandardMaterial color="#080d13" roughness={0.7} metalness={0.26} />
-          </mesh>
+        {layout.buildings.map((building) => (
+            <group key={building.id} position={[building.x, scale * 0.06, building.z]} rotation={[0, building.rotation, 0]}>
+              <mesh position={[0, building.height / 2, 0]}>
+                {building.shape === 'round' ? (
+                    <cylinderGeometry args={[building.width * 0.52, building.width * 0.62, building.height, 8]} />
+                ) : (
+                    <boxGeometry args={[building.width, building.height, building.depth]} />
+                )}
+                <meshStandardMaterial color="#080d13" roughness={0.7} metalness={0.26} />
+              </mesh>
 
-          {building.roof === 'dome' && (
-            <mesh position={[0, building.height + building.width * 0.12, 0]}>
-              <sphereGeometry args={[building.width * 0.28, 10, 8, 0, Math.PI * 2, 0, Math.PI / 2]} />
-              <meshStandardMaterial
-                color="#192430"
-                emissive={building.cool ? '#5fbbdc' : '#d9985a'}
-                emissiveIntensity={selected ? 0.24 : 0.11}
-                roughness={0.46}
-                metalness={0.35}
-              />
-            </mesh>
-          )}
+              {building.roof === 'dome' && (
+                  <mesh position={[0, building.height + building.width * 0.12, 0]}>
+                    <sphereGeometry args={[building.width * 0.28, 10, 8, 0, Math.PI * 2, 0, Math.PI / 2]} />
+                    <meshStandardMaterial
+                        color="#192430"
+                        emissive={building.cool ? '#5fbbdc' : '#d9985a'}
+                        emissiveIntensity={selected ? 0.24 : 0.11}
+                        roughness={0.46}
+                        metalness={0.35}
+                    />
+                  </mesh>
+              )}
 
-          {building.roof === 'spire' && (
-            <mesh position={[0, building.height + building.width * 0.22, 0]}>
-              <coneGeometry args={[building.width * 0.16, building.width * 0.44, 6]} />
-              <meshBasicMaterial color={building.cool ? '#6fd8ff' : '#ffc06f'} transparent opacity={selected ? 0.9 : 0.56} toneMapped={false} />
-            </mesh>
-          )}
+              {building.roof === 'spire' && (
+                  <mesh position={[0, building.height + building.width * 0.22, 0]}>
+                    <coneGeometry args={[building.width * 0.16, building.width * 0.44, 6]} />
+                    <meshBasicMaterial color={building.cool ? '#6fd8ff' : '#ffc06f'} transparent opacity={selected ? 0.9 : 0.56} toneMapped={false} />
+                  </mesh>
+              )}
 
-          {building.roof === 'flat' && (
-            <mesh position={[0, building.height + scale * 0.012, 0]}>
-              <boxGeometry args={[building.width * 0.62, scale * 0.018, building.depth * 0.62]} />
-              <meshBasicMaterial color={building.cool ? '#67c9ea' : '#e9a25c'} transparent opacity={selected ? 0.72 : 0.38} toneMapped={false} />
-            </mesh>
-          )}
+              {building.roof === 'flat' && (
+                  <mesh position={[0, building.height + scale * 0.012, 0]}>
+                    <boxGeometry args={[building.width * 0.62, scale * 0.018, building.depth * 0.62]} />
+                    <meshBasicMaterial color={building.cool ? '#67c9ea' : '#e9a25c'} transparent opacity={selected ? 0.72 : 0.38} toneMapped={false} />
+                  </mesh>
+              )}
 
-          <mesh position={[0, building.height * 0.58, building.depth * 0.505]}>
-            <boxGeometry args={[building.width * 0.56, scale * 0.012, scale * 0.008]} />
-            <meshBasicMaterial color={building.cool ? '#70d8ff' : '#ffbf72'} transparent opacity={selected ? 0.9 : 0.5} toneMapped={false} />
-          </mesh>
-        </group>
-      ))}
+              <mesh position={[0, building.height * 0.58, building.depth * 0.505]}>
+                <boxGeometry args={[building.width * 0.56, scale * 0.012, scale * 0.008]} />
+                <meshBasicMaterial color={building.cool ? '#70d8ff' : '#ffbf72'} transparent opacity={selected ? 0.9 : 0.5} toneMapped={false} />
+              </mesh>
+            </group>
+        ))}
 
-      {layout.pads.map((pad) => (
-        <group key={`pad-${pad.id}`} position={[pad.x, scale * 0.055, pad.z]} rotation={[0, pad.rotation, 0]}>
-          <mesh rotation={[-Math.PI / 2, 0, 0]}>
-            <circleGeometry args={[scale * 0.14, 16]} />
-            <meshStandardMaterial color="#111820" roughness={0.7} metalness={0.36} />
-          </mesh>
-          <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, scale * 0.006, 0]}>
-            <ringGeometry args={[scale * 0.09, scale * 0.115, 20]} />
-            <meshBasicMaterial color="#79d8f7" transparent opacity={selected ? 0.7 : 0.28} toneMapped={false} />
-          </mesh>
-        </group>
-      ))}
+        {layout.pads.map((pad) => (
+            <group key={`pad-${pad.id}`} position={[pad.x, scale * 0.055, pad.z]} rotation={[0, pad.rotation, 0]}>
+              <mesh rotation={[-Math.PI / 2, 0, 0]}>
+                <circleGeometry args={[scale * 0.14, 16]} />
+                <meshStandardMaterial color="#111820" roughness={0.7} metalness={0.36} />
+              </mesh>
+              <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, scale * 0.006, 0]}>
+                <ringGeometry args={[scale * 0.09, scale * 0.115, 20]} />
+                <meshBasicMaterial color="#79d8f7" transparent opacity={selected ? 0.7 : 0.28} toneMapped={false} />
+              </mesh>
+            </group>
+        ))}
 
-      <mesh position={[0, scale * 0.42, 0]}>
-        <cylinderGeometry args={[scale * 0.035, scale * 0.055, scale * 0.72, 8]} />
-        <meshStandardMaterial color="#2c3947" metalness={0.64} roughness={0.3} />
-      </mesh>
-      <mesh position={[0, scale * 0.8, 0]}>
-        <sphereGeometry args={[scale * 0.055, 10, 10]} />
-        <meshBasicMaterial color="#9de7ff" transparent opacity={selected ? 0.9 : 0.48} toneMapped={false} />
-      </mesh>
+        <mesh position={[0, scale * 0.42, 0]}>
+          <cylinderGeometry args={[scale * 0.035, scale * 0.055, scale * 0.72, 8]} />
+          <meshStandardMaterial color="#2c3947" metalness={0.64} roughness={0.3} />
+        </mesh>
+        <mesh position={[0, scale * 0.8, 0]}>
+          <sphereGeometry args={[scale * 0.055, 10, 10]} />
+          <meshBasicMaterial color="#9de7ff" transparent opacity={selected ? 0.9 : 0.48} toneMapped={false} />
+        </mesh>
 
-      <pointLight
-        position={[0, scale * 0.62, 0]}
-        color="#ffc17c"
-        intensity={selected ? 1.05 : 0.4}
-        distance={scale * 4.2}
-        decay={2}
-      />
-    </group>
+        <pointLight
+            position={[0, scale * 0.62, 0]}
+            color="#ffc17c"
+            intensity={selected ? 1.05 : 0.4}
+            distance={scale * 4.2}
+            decay={2}
+        />
+      </group>
   )
 }
 
@@ -233,164 +233,164 @@ function WaterSettlementFeature({ scale, selected, seed }: { scale: number; sele
   }, [scale, seed])
 
   return (
-    <group>
-      <mesh position={[0, scale * 0.04, 0]}>
-        <cylinderGeometry args={[scale * 0.28, scale * 0.34, scale * 0.08, 14]} />
-        <meshStandardMaterial color="#0c141d" roughness={0.56} metalness={0.56} />
-      </mesh>
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, scale * 0.086, 0]}>
-        <ringGeometry args={[scale * 0.11, scale * 0.16, 24]} />
-        <meshStandardMaterial color="#172635" emissive="#62c7e8" emissiveIntensity={selected ? 0.16 : 0.055} roughness={0.5} metalness={0.42} />
-      </mesh>
-      <mesh position={[0, scale * 0.26, 0]}>
-        <cylinderGeometry args={[scale * 0.055, scale * 0.09, scale * 0.42, 8]} />
-        <meshStandardMaterial color="#1a2632" emissive="#67d9ff" emissiveIntensity={selected ? 0.24 : 0.08} metalness={0.48} />
-      </mesh>
+      <group>
+        <mesh position={[0, scale * 0.04, 0]}>
+          <cylinderGeometry args={[scale * 0.28, scale * 0.34, scale * 0.08, 14]} />
+          <meshStandardMaterial color="#0c141d" roughness={0.56} metalness={0.56} />
+        </mesh>
+        <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, scale * 0.086, 0]}>
+          <ringGeometry args={[scale * 0.11, scale * 0.16, 24]} />
+          <meshStandardMaterial color="#172635" emissive="#62c7e8" emissiveIntensity={selected ? 0.16 : 0.055} roughness={0.5} metalness={0.42} />
+        </mesh>
+        <mesh position={[0, scale * 0.26, 0]}>
+          <cylinderGeometry args={[scale * 0.055, scale * 0.09, scale * 0.42, 8]} />
+          <meshStandardMaterial color="#1a2632" emissive="#67d9ff" emissiveIntensity={selected ? 0.24 : 0.08} metalness={0.48} />
+        </mesh>
 
-      {layout.platforms.map((platform) => (
-        <group key={platform.id}>
-          <mesh
-            position={[platform.x / 2, scale * 0.055, platform.z / 2]}
-            rotation={[0, -platform.angle, 0]}
-          >
-            <boxGeometry args={[Math.hypot(platform.x, platform.z), scale * 0.022, scale * 0.035]} />
-            <meshStandardMaterial color="#1d2731" emissive="#4e95ab" emissiveIntensity={0.025} metalness={0.44} roughness={0.54} />
-          </mesh>
+        {layout.platforms.map((platform) => (
+            <group key={platform.id}>
+              <mesh
+                  position={[platform.x / 2, scale * 0.055, platform.z / 2]}
+                  rotation={[0, -platform.angle, 0]}
+              >
+                <boxGeometry args={[Math.hypot(platform.x, platform.z), scale * 0.022, scale * 0.035]} />
+                <meshStandardMaterial color="#1d2731" emissive="#4e95ab" emissiveIntensity={0.025} metalness={0.44} roughness={0.54} />
+              </mesh>
 
-          <mesh position={[platform.x, platform.height / 2 + scale * 0.035, platform.z]}>
-            <cylinderGeometry args={[platform.radius, platform.radius * 1.12, platform.height, 10]} />
-            <meshStandardMaterial color="#0a1219" roughness={0.62} metalness={0.5} />
-          </mesh>
+              <mesh position={[platform.x, platform.height / 2 + scale * 0.035, platform.z]}>
+                <cylinderGeometry args={[platform.radius, platform.radius * 1.12, platform.height, 10]} />
+                <meshStandardMaterial color="#0a1219" roughness={0.62} metalness={0.5} />
+              </mesh>
 
-          {platform.tower && (
-            <mesh position={[platform.x, platform.height + scale * 0.11, platform.z]}>
-              <cylinderGeometry args={[platform.radius * 0.22, platform.radius * 0.34, scale * 0.2, 7]} />
-              <meshStandardMaterial color="#162534" metalness={0.5} roughness={0.48} />
-            </mesh>
-          )}
+              {platform.tower && (
+                  <mesh position={[platform.x, platform.height + scale * 0.11, platform.z]}>
+                    <cylinderGeometry args={[platform.radius * 0.22, platform.radius * 0.34, scale * 0.2, 7]} />
+                    <meshStandardMaterial color="#162534" metalness={0.5} roughness={0.48} />
+                  </mesh>
+              )}
 
-          {platform.dome && (
-            <mesh position={[platform.x, platform.height + scale * 0.075, platform.z]}>
-              <sphereGeometry args={[platform.radius * 0.58, 10, 8, 0, Math.PI * 2, 0, Math.PI / 2]} />
-              <meshStandardMaterial
-                color="#18303b"
-                emissive={platform.cool ? '#5cb9da' : '#d99b57'}
-                emissiveIntensity={selected ? 0.18 : 0.075}
-                roughness={0.38}
-                metalness={0.3}
-              />
-            </mesh>
-          )}
+              {platform.dome && (
+                  <mesh position={[platform.x, platform.height + scale * 0.075, platform.z]}>
+                    <sphereGeometry args={[platform.radius * 0.58, 10, 8, 0, Math.PI * 2, 0, Math.PI / 2]} />
+                    <meshStandardMaterial
+                        color="#18303b"
+                        emissive={platform.cool ? '#5cb9da' : '#d99b57'}
+                        emissiveIntensity={selected ? 0.18 : 0.075}
+                        roughness={0.38}
+                        metalness={0.3}
+                    />
+                  </mesh>
+              )}
 
-          <mesh position={[platform.x, platform.height + scale * 0.045, platform.z]}>
-            <sphereGeometry args={[scale * 0.022, 8, 8]} />
-            <meshBasicMaterial
-              color={platform.cool ? '#71ddff' : '#ffc270'}
-              transparent
-              opacity={selected ? 0.86 : 0.46}
-              toneMapped={false}
-            />
-          </mesh>
-        </group>
-      ))}
+              <mesh position={[platform.x, platform.height + scale * 0.045, platform.z]}>
+                <sphereGeometry args={[scale * 0.022, 8, 8]} />
+                <meshBasicMaterial
+                    color={platform.cool ? '#71ddff' : '#ffc270'}
+                    transparent
+                    opacity={selected ? 0.86 : 0.46}
+                    toneMapped={false}
+                />
+              </mesh>
+            </group>
+        ))}
 
-      {layout.pontoons.map((pontoon) => (
-        <group key={`pontoon-${pontoon.id}`} position={[pontoon.x, scale * 0.045, pontoon.z]} rotation={[0, pontoon.angle, 0]}>
-          <mesh>
-            <boxGeometry args={[scale * 0.2, scale * 0.045, scale * 0.095]} />
-            <meshStandardMaterial color="#101a23" metalness={0.5} roughness={0.55} />
-          </mesh>
-          <mesh position={[scale * 0.075, scale * 0.035, 0]}>
-            <boxGeometry args={[scale * 0.018, scale * 0.07, scale * 0.018]} />
-            <meshBasicMaterial color="#69d2f0" transparent opacity={selected ? 0.72 : 0.36} toneMapped={false} />
-          </mesh>
-        </group>
-      ))}
+        {layout.pontoons.map((pontoon) => (
+            <group key={`pontoon-${pontoon.id}`} position={[pontoon.x, scale * 0.045, pontoon.z]} rotation={[0, pontoon.angle, 0]}>
+              <mesh>
+                <boxGeometry args={[scale * 0.2, scale * 0.045, scale * 0.095]} />
+                <meshStandardMaterial color="#101a23" metalness={0.5} roughness={0.55} />
+              </mesh>
+              <mesh position={[scale * 0.075, scale * 0.035, 0]}>
+                <boxGeometry args={[scale * 0.018, scale * 0.07, scale * 0.018]} />
+                <meshBasicMaterial color="#69d2f0" transparent opacity={selected ? 0.72 : 0.36} toneMapped={false} />
+              </mesh>
+            </group>
+        ))}
 
-      <pointLight
-        position={[0, scale * 0.45, 0]}
-        color="#79ddff"
-        intensity={selected ? 1.15 : 0.44}
-        distance={scale * 4.5}
-        decay={2}
-      />
-    </group>
+        <pointLight
+            position={[0, scale * 0.45, 0]}
+            color="#79ddff"
+            intensity={selected ? 1.15 : 0.44}
+            distance={scale * 4.5}
+            decay={2}
+        />
+      </group>
   )
 }
 
 function VaultFeature({ scale, selected }: { scale: number; selected: boolean }) {
   return (
-    <group>
-      <mesh position={[0, scale * 0.34, 0]}>
-        <boxGeometry args={[scale * 1.9, scale * 0.68, scale * 1.35]} />
-        <meshStandardMaterial color="#252734" metalness={0.68} roughness={0.5} />
-      </mesh>
-      <mesh position={[0, scale * 0.34, scale * 0.69]}>
-        <boxGeometry args={[scale * 0.72, scale * 0.52, scale * 0.08]} />
-        <meshStandardMaterial color="#080b12" emissive="#b863ff" emissiveIntensity={selected ? 1.3 : 0.72} />
-      </mesh>
-      {[-0.7, 0.7].map((x) => (
-        <mesh key={x} position={[scale * x, scale * 0.76, 0]}>
-          <cylinderGeometry args={[scale * 0.08, scale * 0.13, scale * 0.72, 8]} />
-          <meshBasicMaterial color="#c780ff" toneMapped={false} />
+      <group>
+        <mesh position={[0, scale * 0.34, 0]}>
+          <boxGeometry args={[scale * 1.9, scale * 0.68, scale * 1.35]} />
+          <meshStandardMaterial color="#252734" metalness={0.68} roughness={0.5} />
         </mesh>
-      ))}
-      <mesh rotation={[Math.PI / 2, 0, 0]} position={[0, scale * 0.94, 0]}>
-        <torusGeometry args={[scale * 1.05, scale * 0.08, 10, 48]} />
-        <meshBasicMaterial color="#b968ff" transparent opacity={0.78} toneMapped={false} />
-      </mesh>
-      <pointLight position={[0, scale * 0.9, scale * 0.5]} color="#bd68ff" intensity={selected ? 9 : 5} distance={scale * 13} />
-    </group>
+        <mesh position={[0, scale * 0.34, scale * 0.69]}>
+          <boxGeometry args={[scale * 0.72, scale * 0.52, scale * 0.08]} />
+          <meshStandardMaterial color="#080b12" emissive="#b863ff" emissiveIntensity={selected ? 1.3 : 0.72} />
+        </mesh>
+        {[-0.7, 0.7].map((x) => (
+            <mesh key={x} position={[scale * x, scale * 0.76, 0]}>
+              <cylinderGeometry args={[scale * 0.08, scale * 0.13, scale * 0.72, 8]} />
+              <meshBasicMaterial color="#c780ff" toneMapped={false} />
+            </mesh>
+        ))}
+        <mesh rotation={[Math.PI / 2, 0, 0]} position={[0, scale * 0.94, 0]}>
+          <torusGeometry args={[scale * 1.05, scale * 0.08, 10, 48]} />
+          <meshBasicMaterial color="#b968ff" transparent opacity={0.78} toneMapped={false} />
+        </mesh>
+        <pointLight position={[0, scale * 0.9, scale * 0.5]} color="#bd68ff" intensity={selected ? 9 : 5} distance={scale * 13} />
+      </group>
   )
 }
 
 function GenericAnomalyFeature({ scale, selected }: { scale: number; selected: boolean }) {
   return (
-    <group>
-      <mesh rotation={[Math.PI / 2, 0, 0]} position={[0, scale * 0.025, 0]}>
-        <torusGeometry args={[scale * 0.95, scale * 0.1, 14, 56]} />
-        <meshStandardMaterial color="#3b1d48" emissive="#b657d0" emissiveIntensity={selected ? 0.95 : 0.55} roughness={0.7} />
-      </mesh>
-      <mesh position={[0, scale * 0.28, 0]}>
-        <octahedronGeometry args={[scale * 0.46, 1]} />
-        <meshStandardMaterial color="#25142d" emissive="#a34dba" emissiveIntensity={selected ? 0.7 : 0.38} roughness={0.5} metalness={0.18} />
-      </mesh>
-      <pointLight position={[0, scale * 0.2, 0]} color="#b45bcc" intensity={selected ? 3.2 : 1.6} distance={scale * 6} />
-    </group>
+      <group>
+        <mesh rotation={[Math.PI / 2, 0, 0]} position={[0, scale * 0.025, 0]}>
+          <torusGeometry args={[scale * 0.95, scale * 0.1, 14, 56]} />
+          <meshStandardMaterial color="#3b1d48" emissive="#b657d0" emissiveIntensity={selected ? 0.95 : 0.55} roughness={0.7} />
+        </mesh>
+        <mesh position={[0, scale * 0.28, 0]}>
+          <octahedronGeometry args={[scale * 0.46, 1]} />
+          <meshStandardMaterial color="#25142d" emissive="#a34dba" emissiveIntensity={selected ? 0.7 : 0.38} roughness={0.5} metalness={0.18} />
+        </mesh>
+        <pointLight position={[0, scale * 0.2, 0]} color="#b45bcc" intensity={selected ? 3.2 : 1.6} distance={scale * 6} />
+      </group>
   )
 }
 
 function ResourceFeature({ scale, selected }: { scale: number; selected: boolean }) {
   return (
-    <group>
-      {[-0.72, -0.28, 0.18, 0.64].map((x, index) => (
-        <mesh key={x} position={[scale * x, scale * (0.5 + index * 0.13), scale * (index % 2 === 0 ? 0.22 : -0.18)]}>
-          <coneGeometry args={[scale * 0.22, scale * (1.05 + index * 0.16), 6]} />
-          <meshStandardMaterial color="#63ffb2" emissive="#27ff93" emissiveIntensity={selected ? 1.45 : 0.8} roughness={0.23} />
-        </mesh>
-      ))}
-      <pointLight position={[0, scale * 0.85, 0]} color="#42ffa3" intensity={selected ? 8 : 4.5} distance={scale * 12} />
-    </group>
+      <group>
+        {[-0.72, -0.28, 0.18, 0.64].map((x, index) => (
+            <mesh key={x} position={[scale * x, scale * (0.5 + index * 0.13), scale * (index % 2 === 0 ? 0.22 : -0.18)]}>
+              <coneGeometry args={[scale * 0.22, scale * (1.05 + index * 0.16), 6]} />
+              <meshStandardMaterial color="#63ffb2" emissive="#27ff93" emissiveIntensity={selected ? 1.45 : 0.8} roughness={0.23} />
+            </mesh>
+        ))}
+        <pointLight position={[0, scale * 0.85, 0]} color="#42ffa3" intensity={selected ? 8 : 4.5} distance={scale * 12} />
+      </group>
   )
 }
 
 function MissionFeature({ scale, selected }: { scale: number; selected: boolean }) {
   return (
-    <group>
-      <mesh position={[0, scale * 0.74, 0]}>
-        <cylinderGeometry args={[scale * 0.09, scale * 0.18, scale * 1.48, 8]} />
-        <meshStandardMaterial color="#9aabc4" metalness={0.75} roughness={0.28} />
-      </mesh>
-      <mesh rotation={[Math.PI / 2, 0, 0]} position={[0, scale * 1.52, 0]}>
-        <torusGeometry args={[scale * 0.54, scale * 0.07, 12, 40]} />
-        <meshBasicMaterial color="#66e7ff" toneMapped={false} />
-      </mesh>
-      <mesh position={[0, scale * 1.52, 0]}>
-        <sphereGeometry args={[scale * 0.14, 12, 12]} />
-        <meshBasicMaterial color="#ffffff" toneMapped={false} />
-      </mesh>
-      <pointLight position={[0, scale * 1.45, 0]} color="#66e7ff" intensity={selected ? 8 : 4} distance={scale * 12} />
-    </group>
+      <group>
+        <mesh position={[0, scale * 0.74, 0]}>
+          <cylinderGeometry args={[scale * 0.09, scale * 0.18, scale * 1.48, 8]} />
+          <meshStandardMaterial color="#9aabc4" metalness={0.75} roughness={0.28} />
+        </mesh>
+        <mesh rotation={[Math.PI / 2, 0, 0]} position={[0, scale * 1.52, 0]}>
+          <torusGeometry args={[scale * 0.54, scale * 0.07, 12, 40]} />
+          <meshBasicMaterial color="#66e7ff" toneMapped={false} />
+        </mesh>
+        <mesh position={[0, scale * 1.52, 0]}>
+          <sphereGeometry args={[scale * 0.14, 12, 12]} />
+          <meshBasicMaterial color="#ffffff" toneMapped={false} />
+        </mesh>
+        <pointLight position={[0, scale * 1.45, 0]} color="#66e7ff" intensity={selected ? 8 : 4} distance={scale * 12} />
+      </group>
   )
 }
 
@@ -402,12 +402,12 @@ function resolveSurfaceVisual(point: SurfacePoint, isOcean: boolean): SurfaceVis
 }
 
 function SurfaceFeature({
-  point,
-  planet,
-  seedKey,
-  radius,
-  selected,
-}: {
+                          point,
+                          planet,
+                          seedKey,
+                          radius,
+                          selected,
+                        }: {
   point: SurfacePoint
   planet: Planet
   seedKey: string
@@ -415,30 +415,30 @@ function SurfaceFeature({
   selected: boolean
 }) {
   const surfaceInfo = useMemo(
-    () => samplePlanetSurfaceInfo(planet, seedKey, point.latitude, point.longitude, radius),
-    [planet, point.latitude, point.longitude, radius, seedKey],
+      () => samplePlanetSurfaceInfo(planet, seedKey, point.latitude, point.longitude, radius),
+      [planet, point.latitude, point.longitude, radius, seedKey],
   )
   const visualType = resolveSurfaceVisual(point, surfaceInfo.isOcean)
   const isSettlement = visualType === 'settlement-land' || visualType === 'settlement-water'
   const backendScale = THREE.MathUtils.clamp(point.visualScale ?? 1, 0.35, 2)
   const featureScale = (isSettlement
-    ? THREE.MathUtils.clamp(radius * 0.082, 0.13, 0.28)
-    : THREE.MathUtils.clamp(radius * 0.085, 0.14, 0.3)) * backendScale
+      ? THREE.MathUtils.clamp(radius * 0.082, 0.13, 0.28)
+      : THREE.MathUtils.clamp(radius * 0.085, 0.14, 0.3)) * backendScale
   const { position, quaternion } = useMemo(
-    () => surfaceTransform(point, surfaceInfo.radius + featureScale * 0.012),
-    [featureScale, point, surfaceInfo.radius],
+      () => surfaceTransform(point, surfaceInfo.radius + featureScale * 0.012),
+      [featureScale, point, surfaceInfo.radius],
   )
   const featureSeed = hashSeed(`${seedKey}:${point.id}:${visualType}`)
 
   return (
-    <group position={position.toArray()} quaternion={quaternion}>
-      {visualType === 'settlement-land' && <LandSettlementFeature scale={featureScale} selected={selected} seed={featureSeed} />}
-      {visualType === 'settlement-water' && <WaterSettlementFeature scale={featureScale} selected={selected} seed={featureSeed} />}
-      {visualType === 'vault' && <VaultFeature scale={featureScale} selected={selected} />}
-      {visualType === 'anomaly' && <GenericAnomalyFeature scale={featureScale} selected={selected} />}
-      {visualType === 'resource' && <ResourceFeature scale={featureScale} selected={selected} />}
-      {visualType === 'mission' && <MissionFeature scale={featureScale} selected={selected} />}
-    </group>
+      <group position={position.toArray()} quaternion={quaternion}>
+        {visualType === 'settlement-land' && <LandSettlementFeature scale={featureScale} selected={selected} seed={featureSeed} />}
+        {visualType === 'settlement-water' && <WaterSettlementFeature scale={featureScale} selected={selected} seed={featureSeed} />}
+        {visualType === 'vault' && <VaultFeature scale={featureScale} selected={selected} />}
+        {visualType === 'anomaly' && <GenericAnomalyFeature scale={featureScale} selected={selected} />}
+        {visualType === 'resource' && <ResourceFeature scale={featureScale} selected={selected} />}
+        {visualType === 'mission' && <MissionFeature scale={featureScale} selected={selected} />}
+      </group>
   )
 }
 
@@ -462,32 +462,32 @@ function SurfaceMarker({ point, planet, seedKey, radius, selected, onSelect }: {
   }, [position, radius])
 
   return (
-    <group>
-      <Line points={[position, lineEnd]} color={selected ? '#ffffff' : '#66e7ff'} lineWidth={1.3} transparent opacity={0.72} />
-      <mesh
-        position={lineEnd}
-        onPointerOver={(event) => {
-          event.stopPropagation()
-          setHovered(true)
-        }}
-        onPointerOut={() => setHovered(false)}
-        onClick={(event) => {
-          event.stopPropagation()
-          onSelect()
-        }}
-      >
-        <sphereGeometry args={[selected || hovered ? 0.1 : 0.072, 18, 18]} />
-        <meshBasicMaterial color={selected ? '#ffffff' : '#66e7ff'} toneMapped={false} depthTest={false} />
-      </mesh>
-      {(hovered || selected) && (
-        <Html position={lineEnd} center distanceFactor={7} style={{ pointerEvents: 'none' }}>
-          <div className="surface-label">
-            <strong>{point.label}</strong>
-            <span>{point.kind}</span>
-          </div>
-        </Html>
-      )}
-    </group>
+      <group>
+        <Line points={[position, lineEnd]} color={selected ? '#ffffff' : '#66e7ff'} lineWidth={1.3} transparent opacity={0.72} />
+        <mesh
+            position={lineEnd}
+            onPointerOver={(event) => {
+              event.stopPropagation()
+              setHovered(true)
+            }}
+            onPointerOut={() => setHovered(false)}
+            onClick={(event) => {
+              event.stopPropagation()
+              onSelect()
+            }}
+        >
+          <sphereGeometry args={[selected || hovered ? 0.1 : 0.072, 18, 18]} />
+          <meshBasicMaterial color={selected ? '#ffffff' : '#66e7ff'} toneMapped={false} depthTest={false} />
+        </mesh>
+        {(hovered || selected) && (
+            <Html position={lineEnd} center distanceFactor={7} style={{ pointerEvents: 'none' }}>
+              <div className="surface-label">
+                <strong>{point.label}</strong>
+                <span>{point.kind}</span>
+              </div>
+            </Html>
+        )}
+      </group>
   )
 }
 
@@ -504,11 +504,11 @@ function LatitudeBands({ radius }: { radius: number }) {
   }, [radius])
 
   return (
-    <>
-      {lines.map((points, index) => (
-        <Line key={index} points={points} color="#9ed9ff" lineWidth={0.55} transparent opacity={0.16} />
-      ))}
-    </>
+      <>
+        {lines.map((points, index) => (
+            <Line key={index} points={points} color="#9ed9ff" lineWidth={0.55} transparent opacity={0.16} />
+        ))}
+      </>
   )
 }
 
@@ -516,10 +516,12 @@ function getInspectionPrimaryLayout(system: StarSystem, planet: Planet) {
   const direction = new THREE.Vector3(-0.12, 0.04, -1).normalize()
   const distance = THREE.MathUtils.clamp(72 + planet.orbitRadius * 16, 120, 220)
   const primaryRadius = getSystemPrimaryRadius(system)
+  // Preserve the primary's apparent angular size: nearby planets see a larger star,
+  // while remote planets see a genuinely tiny one. Clamp only the extreme ends.
   const angularRadius = THREE.MathUtils.clamp(
-    (primaryRadius / Math.max(planet.orbitRadius, 0.1)) * 0.16,
-    0.018,
-    0.065,
+      (primaryRadius / Math.max(planet.orbitRadius, 0.1)) * 0.16,
+      0.004,
+      0.07,
   )
   const visualRadius = distance * angularRadius
 
@@ -534,19 +536,19 @@ function getInspectionPrimaryLayout(system: StarSystem, planet: Planet) {
 function InspectionPrimary({ system, planet }: { system: StarSystem; planet: Planet }) {
   const layout = useMemo(() => getInspectionPrimaryLayout(system, planet), [planet, system])
   return (
-    <group position={layout.position.toArray()}>
-      <SystemPrimaryVisual system={system} scale={layout.scale} detail="inspection" />
-    </group>
+      <group position={layout.position.toArray()}>
+        <SystemPrimaryVisual system={system} scale={layout.scale} detail="inspection" />
+      </group>
   )
 }
 
 function ColonyPod({
-  planet,
-  seedKey,
-  radius,
-  sequence,
-  onImpact,
-}: {
+                     planet,
+                     seedKey,
+                     radius,
+                     sequence,
+                     onImpact,
+                   }: {
   planet: Planet
   seedKey: string
   radius: number
@@ -617,40 +619,40 @@ function ColonyPod({
   const podScale = THREE.MathUtils.clamp(radius * 0.085, 0.12, 0.24)
 
   return (
-    <group>
-      <group ref={pod}>
-        <mesh>
-          <capsuleGeometry args={[podScale * 0.34, podScale * 0.9, 8, 12]} />
-          <meshStandardMaterial color="#d7e1ec" metalness={0.72} roughness={0.26} />
+      <group>
+        <group ref={pod}>
+          <mesh>
+            <capsuleGeometry args={[podScale * 0.34, podScale * 0.9, 8, 12]} />
+            <meshStandardMaterial color="#d7e1ec" metalness={0.72} roughness={0.26} />
+          </mesh>
+          <mesh position={[0, podScale * 0.68, 0]}>
+            <coneGeometry args={[podScale * 0.23, podScale * 0.52, 10]} />
+            <meshStandardMaterial color="#536477" metalness={0.78} roughness={0.24} />
+          </mesh>
+          <mesh position={[0, -podScale * 0.68, 0]}>
+            <coneGeometry args={[podScale * 0.28, podScale * 0.72, 10]} />
+            <meshBasicMaterial color="#ffb65c" transparent opacity={0.82} toneMapped={false} />
+          </mesh>
+          <pointLight color="#ffb35b" intensity={2.8} distance={podScale * 9} decay={2} />
+        </group>
+        <mesh ref={impactRing} visible={false}>
+          <ringGeometry args={[podScale * 0.58, podScale * 0.82, 48]} />
+          <meshBasicMaterial ref={impactMaterial} color="#ffd58d" transparent opacity={0} side={THREE.DoubleSide} depthWrite={false} toneMapped={false} />
         </mesh>
-        <mesh position={[0, podScale * 0.68, 0]}>
-          <coneGeometry args={[podScale * 0.23, podScale * 0.52, 10]} />
-          <meshStandardMaterial color="#536477" metalness={0.78} roughness={0.24} />
-        </mesh>
-        <mesh position={[0, -podScale * 0.68, 0]}>
-          <coneGeometry args={[podScale * 0.28, podScale * 0.72, 10]} />
-          <meshBasicMaterial color="#ffb65c" transparent opacity={0.82} toneMapped={false} />
-        </mesh>
-        <pointLight color="#ffb35b" intensity={2.8} distance={podScale * 9} decay={2} />
+        <pointLight ref={impactLight} color="#ffd18a" intensity={0} distance={radius * 2.2} decay={2} />
       </group>
-      <mesh ref={impactRing} visible={false}>
-        <ringGeometry args={[podScale * 0.58, podScale * 0.82, 48]} />
-        <meshBasicMaterial ref={impactMaterial} color="#ffd58d" transparent opacity={0} side={THREE.DoubleSide} depthWrite={false} toneMapped={false} />
-      </mesh>
-      <pointLight ref={impactLight} color="#ffd18a" intensity={0} distance={radius * 2.2} decay={2} />
-    </group>
   )
 }
 
 export function PlanetScene({
-  system,
-  planet,
-  seedKey,
-  selectedPointId,
-  colonizationSequence,
-  onColonizationImpact,
-  onSelectPoint,
-}: {
+                              system,
+                              planet,
+                              seedKey,
+                              selectedPointId,
+                              colonizationSequence,
+                              onColonizationImpact,
+                              onSelectPoint,
+                            }: {
   system: StarSystem
   planet: Planet
   seedKey: string
@@ -669,22 +671,22 @@ export function PlanetScene({
     // rotate local -X—not +X—toward the inspection sun. Convert the sun into
     // the tilted planet frame first so the visual day side and climate agree.
     const tilt = new THREE.Quaternion().setFromEuler(
-      new THREE.Euler(0.08, 0, THREE.MathUtils.degToRad(planet.axialTilt)),
+        new THREE.Euler(0.08, 0, THREE.MathUtils.degToRad(planet.axialTilt)),
     )
     const localSunDirection = inspectionPrimaryLayout.position
-      .clone()
-      .normalize()
-      .applyQuaternion(tilt.invert())
+        .clone()
+        .normalize()
+        .applyQuaternion(tilt.invert())
     return yawForSubstellarMeshAxis(localSunDirection.x, localSunDirection.z)
   }, [inspectionPrimaryLayout, planet.axialTilt])
   const radius = planet.radius * 2.25
   const inspectionLensingRadius = isBlackHoleSystem(system)
-    ? (system.blackHole?.accretionDisk?.outerRadius ?? getSystemPrimaryRadius(system) * 4)
+      ? (system.blackHole?.accretionDisk?.outerRadius ?? getSystemPrimaryRadius(system) * 4)
       * inspectionPrimaryLayout.scale
       * (system.blackHole?.lensingRadiusMultiplier ?? (isGalacticCoreSystem(system) ? 1.18 : 1.0))
-    : 0
+      : 0
   const inspectionLensingStrength = system.blackHole?.lensingStrength
-    ?? (isGalacticCoreSystem(system) ? 1.32 : 0.92)
+      ?? (isGalacticCoreSystem(system) ? 1.32 : 0.92)
   const urbanLights = useMemo(() => buildUrbanLightSites(planet, seedKey, radius), [planet, radius, seedKey])
 
   useFrame((_, delta) => {
@@ -692,88 +694,88 @@ export function PlanetScene({
   })
 
   return (
-    <group>
-      {isBlackHoleSystem(system) && (
-        <BlackHoleLensingPass
-          worldPosition={inspectionPrimaryLayout.position.toArray() as [number, number, number]}
-          influenceRadius={inspectionLensingRadius}
-          strength={inspectionLensingStrength}
-        />
-      )}
-      <InspectionPrimary system={system} planet={planet} />
-      <ambientLight intensity={0.2} />
-      <hemisphereLight color="#cbdcff" groundColor="#090d19" intensity={0.38} />
-      <group
-        rotation={[0.08, 0, THREE.MathUtils.degToRad(planet.axialTilt)]}
-        userData={{ blackHoleLensingBody: true }}
-      >
-        <group ref={spinGroup} rotation={[0, tidallyLocked ? lockedInspectionYaw : 0, 0]}>
-          <group
-            onClick={(event) => {
-              event.stopPropagation()
-              setFocusedMoon(undefined)
-              onSelectPoint(undefined)
-            }}
-          >
-            <ProceduralPlanet planet={planet} seedKey={seedKey} detail="detail" radius={radius} />
-          </group>
-          <LatitudeBands radius={radius} />
-          {urbanLights.map((light) => (
-            <pointLight
-              key={light.id}
-              position={light.position}
-              color={light.color}
-              intensity={light.intensity}
-              distance={light.distance}
-              decay={2}
+      <group>
+        {isBlackHoleSystem(system) && (
+            <BlackHoleLensingPass
+                worldPosition={inspectionPrimaryLayout.position.toArray() as [number, number, number]}
+                influenceRadius={inspectionLensingRadius}
+                strength={inspectionLensingStrength}
             />
-          ))}
-          {colonizationSequence > 0 && (
-            <ColonyPod
-              key={colonizationSequence}
-              planet={planet}
-              seedKey={seedKey}
-              radius={radius}
-              sequence={colonizationSequence}
-              onImpact={onColonizationImpact}
-            />
-          )}
-          {planet.surfacePoints.map((point) => (
-            <group key={point.id}>
-              <SurfaceFeature
-                point={point}
-                planet={planet}
-                seedKey={seedKey}
-                radius={radius}
-                selected={selectedPointId === point.id}
-              />
-              <SurfaceMarker
-                point={point}
-                planet={planet}
-                seedKey={seedKey}
-                radius={radius}
-                selected={selectedPointId === point.id}
-                onSelect={() => onSelectPoint(point)}
-              />
+        )}
+        <InspectionPrimary system={system} planet={planet} />
+        <ambientLight intensity={0.2} />
+        <hemisphereLight color="#cbdcff" groundColor="#090d19" intensity={0.38} />
+        <group
+            rotation={[0.08, 0, THREE.MathUtils.degToRad(planet.axialTilt)]}
+            userData={{ blackHoleLensingBody: true }}
+        >
+          <group ref={spinGroup} rotation={[0, tidallyLocked ? lockedInspectionYaw : 0, 0]}>
+            <group
+                onClick={(event) => {
+                  event.stopPropagation()
+                  setFocusedMoon(undefined)
+                  onSelectPoint(undefined)
+                }}
+            >
+              <ProceduralPlanet planet={planet} seedKey={seedKey} detail="detail" radius={radius} />
             </group>
-          ))}
+            <LatitudeBands radius={radius} />
+            {urbanLights.map((light) => (
+                <pointLight
+                    key={light.id}
+                    position={light.position}
+                    color={light.color}
+                    intensity={light.intensity}
+                    distance={light.distance}
+                    decay={2}
+                />
+            ))}
+            {colonizationSequence > 0 && (
+                <ColonyPod
+                    key={colonizationSequence}
+                    planet={planet}
+                    seedKey={seedKey}
+                    radius={radius}
+                    sequence={colonizationSequence}
+                    onImpact={onColonizationImpact}
+                />
+            )}
+            {planet.surfacePoints.map((point) => (
+                <group key={point.id}>
+                  <SurfaceFeature
+                      point={point}
+                      planet={planet}
+                      seedKey={seedKey}
+                      radius={radius}
+                      selected={selectedPointId === point.id}
+                  />
+                  <SurfaceMarker
+                      point={point}
+                      planet={planet}
+                      seedKey={seedKey}
+                      radius={radius}
+                      selected={selectedPointId === point.id}
+                      onSelect={() => onSelectPoint(point)}
+                  />
+                </group>
+            ))}
+          </group>
+          <PlanetRings planet={planet} radius={radius} />
         </group>
-        <PlanetRings planet={planet} radius={radius} />
+        <MoonSystem
+            moons={planet.moons}
+            parentRadius={radius}
+            mode="inspection"
+            focusedMoonId={focusedMoon?.id}
+            onFocusMoon={setFocusedMoon}
+        />
+        <MoonFocusController
+            focus={focusedMoon}
+            onClear={() => setFocusedMoon(undefined)}
+            distanceMultiplier={8}
+        />
+        <directionalLight position={inspectionPrimaryLayout.position.toArray()} intensity={5.1} color={getSystemPrimaryColor(system)} />
+        <pointLight position={[-5, -2, -4]} intensity={1.7} color="#4d79ff" />
       </group>
-      <MoonSystem
-        moons={planet.moons}
-        parentRadius={radius}
-        mode="inspection"
-        focusedMoonId={focusedMoon?.id}
-        onFocusMoon={setFocusedMoon}
-      />
-      <MoonFocusController
-        focus={focusedMoon}
-        onClear={() => setFocusedMoon(undefined)}
-        distanceMultiplier={8}
-      />
-      <directionalLight position={inspectionPrimaryLayout.position.toArray()} intensity={5.1} color={getSystemPrimaryColor(system)} />
-      <pointLight position={[-5, -2, -4]} intensity={1.7} color="#4d79ff" />
-    </group>
   )
 }

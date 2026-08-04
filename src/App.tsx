@@ -147,10 +147,10 @@ export default function App({ currentPlayer }: { currentPlayer: PlayerIdentity }
     if (!system) return 42
     if (isGalacticCoreSystem(system)) {
       const diskRadius = system.blackHole?.accretionDisk?.outerRadius ?? 18
-      return MathUtils.clamp(diskRadius * 9.2, 155, 260)
+      return MathUtils.clamp(diskRadius * 18, 320, 900)
     }
     const outerOrbit = Math.max(...system.planets.map((candidate) => candidate.orbitRadius), 8)
-    return MathUtils.clamp(outerOrbit * 2.35 * 1.18, 42, 96)
+    return MathUtils.clamp(outerOrbit * 2.35 * 3.2, 140, 720)
   }, [system])
 
   const camera =
@@ -159,7 +159,7 @@ export default function App({ currentPlayer }: { currentPlayer: PlayerIdentity }
           : view.type === 'galaxy'
               ? { position: [0, 3440, 5520] as [number, number, number], fov: 46, near: 0.1, far: 24000 }
               : view.type === 'system'
-                  ? { position: [0, systemCameraDistance * 0.56, systemCameraDistance] as [number, number, number], fov: 46, near: 0.1, far: systemIsCore ? 1800 : 700 }
+                  ? { position: [0, systemCameraDistance * 0.56, systemCameraDistance] as [number, number, number], fov: 46, near: 0.1, far: 12000 }
                   : { position: [0, 1.2, 9] as [number, number, number], fov: 42, near: 0.1, far: 2400 }
 
   function transitionTo(nextView: ViewState, label: string) {
@@ -314,7 +314,7 @@ export default function App({ currentPlayer }: { currentPlayer: PlayerIdentity }
                   makeDefault
                   enablePan={view.type !== 'planet'}
                   minDistance={view.type === 'planet' ? 0.7 : 0.85}
-                  maxDistance={view.type === 'system' ? 170 : 15}
+                  maxDistance={view.type === 'system' ? 4000 : 15}
                   minPolarAngle={0.22}
                   maxPolarAngle={Math.PI - 0.22}
                   dampingFactor={0.055}
