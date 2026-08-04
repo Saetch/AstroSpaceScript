@@ -64,16 +64,12 @@ export class SpacetimeUniverseRepository implements UniverseRepository {
 
   setGalaxies(galaxies: Galaxy[]): void {
     const previousById = new Map(
-        this.snapshot.galaxies.map(galaxy => [
-          galaxy.id,
-          galaxy,
-        ]),
+      this.snapshot.galaxies.map((galaxy) => [galaxy.id, galaxy]),
     )
 
-    let changed =
-        galaxies.length !== this.snapshot.galaxies.length
+    let changed = galaxies.length !== this.snapshot.galaxies.length
 
-    const mergedGalaxies = galaxies.map(next => {
+    const mergedGalaxies = galaxies.map((next) => {
       const previous = previousById.get(next.id)
 
       if (previous && sameGalaxy(previous, next)) {
@@ -97,8 +93,24 @@ export class SpacetimeUniverseRepository implements UniverseRepository {
     this.listeners.forEach(listener => listener())
   }
 
+  setVisibleData(galaxies: Galaxy[], systems: UniverseSnapshot['systems']): void {
+    const previousById = new Map(
+      this.snapshot.galaxies.map((galaxy) => [galaxy.id, galaxy]),
+    )
 
+    const mergedGalaxies = galaxies.map((next) => {
+      const previous = previousById.get(next.id)
+      return previous && sameGalaxy(previous, next) ? previous : next
+    })
 
+    this.setSnapshot({
+      ...this.snapshot,
+      galaxies: mergedGalaxies,
+      systems,
+      connection: 'live',
+      updatedAt: new Date().toISOString(),
+    })
+  }
 
   retainSystem = (systemId: string) => {
     this.retainedSystemRefs.set(systemId, (this.retainedSystemRefs.get(systemId) ?? 0) + 1)

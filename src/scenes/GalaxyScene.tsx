@@ -12,12 +12,7 @@ import { ownershipKey, ownershipTone, resolveOwnership, systemOwnershipLabel } f
 const GALAXY_WORLD_SCALE = 4
 const BASE_GALAXY_RADIUS = 600
 const GALAXY_RADIUS = BASE_GALAXY_RADIUS * GALAXY_WORLD_SCALE
-const GALAXY_ARMS = 5
-const GALAXY_TWIST = 0.014
 const GALAXY_ROTATION_SPEED = 0.0002
-const CHARTED_ARM = 1
-const BASE_CHARTED_RADIUS = 355
-const CHARTED_RADIUS = BASE_CHARTED_RADIUS * GALAXY_WORLD_SCALE
 const LABEL_VISIBILITY_DISTANCE = 720 * GALAXY_WORLD_SCALE
 const DEFAULT_CAMERA_POSITION = new THREE.Vector3(0, 860 * GALAXY_WORLD_SCALE, 1380 * GALAXY_WORLD_SCALE)
 const DEFAULT_CAMERA_TARGET = new THREE.Vector3(0, 0, 0)
@@ -49,52 +44,72 @@ type TerritoryResult = {
   runnerUpScore: number
 }
 
-function seededRandom(seed: number) {
-  let state = seed >>> 0
-  return () => {
-    state += 0x6d2b79f5
-    let t = state
-    t = Math.imul(t ^ (t >>> 15), t | 1)
-    t ^= t + Math.imul(t ^ (t >>> 7), t | 61)
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296
-  }
-}
-
 function smoothstep(edge0: number, edge1: number, value: number) {
   const x = THREE.MathUtils.clamp((value - edge0) / (edge1 - edge0), 0, 1)
   return x * x * (3 - 2 * x)
 }
 
-function chartedRegionCenter() {
-  const angle = CHARTED_ARM * ((Math.PI * 2) / GALAXY_ARMS) + BASE_CHARTED_RADIUS * GALAXY_TWIST
-  return new THREE.Vector3(Math.cos(angle) * CHARTED_RADIUS, 0, Math.sin(angle) * CHARTED_RADIUS)
+function primaryGalaxyBody(galaxy: Galaxy) {
+  const bodies = getGalaxyBodies(galaxy)
+  return bodies.find((body) => body.primary) ?? bodies[0]
 }
 
-function projectSystemPositions(systems: StarSystem[]) {
-  if (systems.length === 0) return []
-
-  const center = chartedRegionCenter()
-  const centerAngle = Math.atan2(center.z, center.x)
-  const radial = new THREE.Vector3(Math.cos(centerAngle), 0, Math.sin(centerAngle))
-  const tangent = new THREE.Vector3(-Math.sin(centerAngle), 0, Math.cos(centerAngle))
-  const averageX = systems.reduce((sum, system) => sum + system.position[0], 0) / systems.length
-  const averageY = systems.reduce((sum, system) => sum + system.position[1], 0) / systems.length
-  const averageZ = systems.reduce((sum, system) => sum + system.position[2], 0) / systems.length
-
-  return systems.map((system) => {
-    const localX = system.position[0] - averageX
-    const localY = system.position[1] - averageY
-    const localZ = system.position[2] - averageZ
-
-    return center
-      .clone()
-      .addScaledVector(tangent, localX * GALAXY_WORLD_SCALE)
-      .addScaledVector(radial, localZ * GALAXY_WORLD_SCALE)
-      .add(new THREE.Vector3(0, localY * 0.32 * GALAXY_WORLD_SCALE, 0))
-  })
+function galaxyDisplayScale(galaxy: Galaxy) {
+  return GALAXY_RADIUS / galaxyGroupExtent(galaxy)
 }
 
-function buildTerritoryGroups(systems: StarSystem[], positions: THREE.Vector3[]) {
+function bodyDisplayThickness(body: ReturnType<typeof getGalaxyBodies>[number]) {
+  return Math.max(8, body.thickness * GALAXY_WORLD_SCALE)
+}
+
+/**
+ * Converts backend galaxy-local coordinates into the opened galaxy scene.
+ *
+ * Backend convention:
+ * - (0, 0, 0) is the center of the galaxy.
+ * - x/z are measured in the same local units as galaxy.radius.
+ * - y is measured in the same local units as galaxy.thickness.
+ *
+ * The common GALAXY_TILT is applied by the parent group, so it must not be
+ * applied here. Only the primary body's own transform belongs here.
+ */
+function projectSystemPositions(galaxy: Galaxy, systems: StarSystem[]) {
+  const body = primaryGalaxyBody(galaxy)
+  if (!body) return []
+
+  const radialScale = galaxyDisplayScale(galaxy)
+  const verticalScale = body.thickness > 0
+    ? bodyDisplayThickness(body) / body.thickness
+    : GALAXY_WORLD_SCALE
+
+  const bodyOffset = new THREE.Vector3(
+    body.offset[0],
+    body.offset[1],
+    body.offset[2],
+  ).multiplyScalar(radialScale)
+
+  const bodyRotation = new THREE.Euler(
+    body.inclination?.[0] ?? 0,
+    body.rotation,
+    body.inclination?.[2] ?? 0,
+  )
+
+  return systems.map((system) =>
+    new THREE.Vector3(
+      system.position[0] * radialScale,
+      system.position[1] * verticalScale,
+      system.position[2] * radialScale,
+    )
+      .applyEuler(bodyRotation)
+      .add(bodyOffset),
+  )
+}
+
+function buildTerritoryGroups(
+  systems: StarSystem[],
+  positions: THREE.Vector3[],
+  displayScale: number,
+) {
   const groups = new Map<string, TerritoryGroup>()
 
   systems.forEach((system, index) => {
@@ -107,7 +122,7 @@ function buildTerritoryGroups(systems: StarSystem[], positions: THREE.Vector3[])
       position: positions[index],
       color,
       colorKey,
-      radius: Math.max(1, system.zoneRadius) * GALAXY_WORLD_SCALE,
+      radius: Math.max(1, system.zoneRadius) * displayScale,
       strength: Math.max(0.01, system.zoneStrength ?? 1),
       name: system.zoneName ?? system.faction,
     }
@@ -186,12 +201,9 @@ function MassiveGalaxyBody({
   body: ReturnType<typeof getGalaxyBodies>[number]
   territoryGroups: TerritoryGroup[]
 }) {
-  const displayScale = GALAXY_RADIUS / galaxyGroupExtent(galaxy)
+  const displayScale = galaxyDisplayScale(galaxy)
   const displayRadius = body.radius * displayScale
-  const displayThickness = Math.max(
-      8,
-      body.thickness * GALAXY_WORLD_SCALE,
-  )
+  const displayThickness = bodyDisplayThickness(body)
 
   const displayOffset = useMemo(
       () =>
@@ -220,27 +232,30 @@ function MassiveGalaxyBody({
             ),
         )
 
-    console.error('ACTUAL GEOMETRY EFFECT START', {
-      galaxyId: galaxy.id,
-      bodyId: body.id,
-    })
+    const bodyRotation = new THREE.Euler(
+      body.inclination?.[0] ?? 0,
+      body.rotation,
+      body.inclination?.[2] ?? 0,
+    )
+    const territoryPoint = new THREE.Vector3()
 
     const nextGeometry = buildGalaxyPointGeometry(body, {
       count,
       radius: displayRadius,
       thickness: displayThickness,
-      colorTransform: (color, x, _y, z) =>
-          tintWithTerritories(
-              color,
-              x + displayOffset.x,
-              z + displayOffset.z,
-              territoryGroups,
-          ),
-    })
+      colorTransform: (color, x, y, z) => {
+        territoryPoint
+          .set(x, y, z)
+          .applyEuler(bodyRotation)
+          .add(displayOffset)
 
-    console.error('ACTUAL GEOMETRY EFFECT COMPLETE', {
-      galaxyId: galaxy.id,
-      bodyId: body.id,
+        return tintWithTerritories(
+          color,
+          territoryPoint.x,
+          territoryPoint.z,
+          territoryGroups,
+        )
+      },
     })
 
     setGeometry(nextGeometry)
@@ -308,20 +323,11 @@ function MassiveGalaxy({ galaxy, territoryGroups }: { galaxy: Galaxy; territoryG
       () => getGalaxyBodies(galaxy),
       [geometryKey],
   )
-  const displayScale = GALAXY_RADIUS / galaxyGroupExtent(galaxy)
+  const displayScale = galaxyDisplayScale(galaxy)
   const interactionStreams = useMemo(
     () => buildGalaxyInteractionStreams(galaxy, displayScale, 18000),
     [displayScale, galaxy],
   )
-  for (const body of bodies){
-    console.log('BUILD GEOMETRY', {
-      galaxyId: galaxy.id,
-      bodyId: body.id,
-      primary: body.primary,
-    })
-  }
-
-
   useEffect(() => () => {
     interactionStreams.forEach((stream) => stream.geometry.dispose())
   }, [interactionStreams])
@@ -458,56 +464,197 @@ function MergedTerritoryMap({ territoryGroups }: { territoryGroups: TerritoryGro
   )
 }
 
-function SystemInstances({ systems, positions, onOpenSystem, onHover }: {
+function SystemInstances({ systems, positions, currentPlayer, onOpenSystem, onHover }: {
   systems: StarSystem[]
   positions: THREE.Vector3[]
+  currentPlayer: PlayerIdentity
   onOpenSystem: (id: string) => void
   onHover: (index?: number) => void
 }) {
   const cores = useRef<THREE.InstancedMesh>(null)
   const glows = useRef<THREE.InstancedMesh>(null)
+  const rings = useRef<THREE.InstancedMesh>(null)
+  const stems = useRef<THREE.InstancedMesh>(null)
+  const unclaimedDiamonds = useRef<THREE.InstancedMesh>(null)
+  const blackHoleDiscs = useRef<THREE.InstancedMesh>(null)
+  const blackHoleRings = useRef<THREE.InstancedMesh>(null)
   const hitTargets = useRef<THREE.InstancedMesh>(null)
-  const coreGeometry = useMemo(() => new THREE.IcosahedronGeometry(1, 2), [])
-  const glowGeometry = useMemo(() => new THREE.SphereGeometry(1, 16, 16), [])
-  const hitGeometry = useMemo(() => new THREE.SphereGeometry(1, 10, 10), [])
+
+  const markerKinds = useMemo(() => {
+    const unclaimedIndexes: number[] = []
+    const blackHoleIndexes: number[] = []
+
+    systems.forEach((system, index) => {
+      if (resolveOwnership(system.owner, currentPlayer).relation === 'unclaimed') {
+        unclaimedIndexes.push(index)
+      }
+      if (isBlackHoleSystem(system)) blackHoleIndexes.push(index)
+    })
+
+    return { unclaimedIndexes, blackHoleIndexes }
+  }, [currentPlayer, systems])
+
+  const coreGeometry = useMemo(() => new THREE.IcosahedronGeometry(1, 1), [])
+  const glowGeometry = useMemo(() => new THREE.SphereGeometry(1, 8, 6), [])
+  const ringGeometry = useMemo(() => new THREE.RingGeometry(4.5, 5.1, 32), [])
+  const stemGeometry = useMemo(() => new THREE.CylinderGeometry(0.18, 0.18, 10.4, 6), [])
+  const unclaimedGeometry = useMemo(() => new THREE.RingGeometry(7.2, 7.65, 4), [])
+  const blackHoleDiscGeometry = useMemo(() => new THREE.CircleGeometry(2.8, 24), [])
+  const blackHoleRingGeometry = useMemo(() => new THREE.RingGeometry(3.2, 4.1, 32), [])
+  const hitGeometry = useMemo(() => new THREE.IcosahedronGeometry(1, 0), [])
+
   const coreMaterial = useMemo(() => new THREE.MeshBasicMaterial({
-    color: '#ffffff', toneMapped: false, depthTest: false, blending: THREE.AdditiveBlending,
+    color: '#ffffff',
+    toneMapped: false,
+    depthTest: false,
+    blending: THREE.AdditiveBlending,
   }), [])
   const glowMaterial = useMemo(() => new THREE.MeshBasicMaterial({
-    color: '#ffffff', toneMapped: false, transparent: true, opacity: 0.58,
-    depthWrite: false, depthTest: false, blending: THREE.AdditiveBlending,
+    color: '#ffffff',
+    toneMapped: false,
+    transparent: true,
+    opacity: 0.5,
+    depthWrite: false,
+    depthTest: false,
+    blending: THREE.AdditiveBlending,
   }), [])
-  const hitMaterial = useMemo(() => new THREE.MeshBasicMaterial({ transparent: true, opacity: 0, depthWrite: false, depthTest: false }), [])
+  const ringMaterial = useMemo(() => new THREE.MeshBasicMaterial({
+    color: '#ffffff',
+    transparent: true,
+    opacity: 0.82,
+    side: THREE.DoubleSide,
+    toneMapped: false,
+    depthWrite: false,
+    depthTest: false,
+  }), [])
+  const stemMaterial = useMemo(() => new THREE.MeshBasicMaterial({
+    color: '#ffffff',
+    transparent: true,
+    opacity: 0.46,
+    toneMapped: false,
+    depthWrite: false,
+    depthTest: false,
+  }), [])
+  const unclaimedMaterial = useMemo(() => new THREE.MeshBasicMaterial({
+    color: '#f3bb65',
+    transparent: true,
+    opacity: 0.66,
+    side: THREE.DoubleSide,
+    toneMapped: false,
+    depthWrite: false,
+    depthTest: false,
+  }), [])
+  const blackHoleDiscMaterial = useMemo(() => new THREE.MeshBasicMaterial({
+    color: '#000000',
+    side: THREE.DoubleSide,
+    toneMapped: false,
+    depthWrite: false,
+    depthTest: false,
+  }), [])
+  const blackHoleRingMaterial = useMemo(() => new THREE.MeshBasicMaterial({
+    color: '#ffffff',
+    transparent: true,
+    opacity: 0.95,
+    side: THREE.DoubleSide,
+    toneMapped: false,
+    depthWrite: false,
+    depthTest: false,
+    blending: THREE.AdditiveBlending,
+  }), [])
+  const hitMaterial = useMemo(() => new THREE.MeshBasicMaterial({
+    transparent: true,
+    opacity: 0,
+    colorWrite: false,
+    depthWrite: false,
+    depthTest: false,
+  }), [])
+
   const dummy = useMemo(() => new THREE.Object3D(), [])
 
   useLayoutEffect(() => {
-    if (!cores.current || !glows.current || !hitTargets.current) return
+    if (!cores.current || !glows.current || !rings.current || !stems.current || !hitTargets.current) return
 
     positions.forEach((position, index) => {
-      const baseScale = 1.95 + getSystemPrimaryRadius(systems[index]) * 0.46
-      const color = new THREE.Color(getSystemPrimaryColor(systems[index]))
+      const system = systems[index]
+      const baseScale = 1.95 + getSystemPrimaryRadius(system) * 0.46
+      const primaryColor = new THREE.Color(getSystemPrimaryColor(system))
+      const ownership = resolveOwnership(system.owner, currentPlayer)
+      const beaconColor = new THREE.Color(
+        isBlackHoleSystem(system)
+          ? getSystemPrimaryColor(system)
+          : ownership.relation === 'unclaimed'
+            ? '#f3bb65'
+            : system.zoneColor ?? '#87dcff',
+      )
+
       dummy.position.copy(position)
+      dummy.rotation.set(0, 0, 0)
       dummy.scale.setScalar(baseScale)
       dummy.updateMatrix()
       cores.current!.setMatrixAt(index, dummy.matrix)
-      cores.current!.setColorAt(index, color)
+      cores.current!.setColorAt(index, primaryColor)
 
       dummy.scale.setScalar(baseScale * 5.1)
       dummy.updateMatrix()
       glows.current!.setMatrixAt(index, dummy.matrix)
-      glows.current!.setColorAt(index, color)
+      glows.current!.setColorAt(index, primaryColor)
 
+      dummy.rotation.set(Math.PI / 2, 0, 0)
+      dummy.scale.setScalar(1)
+      dummy.updateMatrix()
+      rings.current!.setMatrixAt(index, dummy.matrix)
+      rings.current!.setColorAt(index, beaconColor)
+
+      dummy.position.set(position.x, position.y + 5.2, position.z)
+      dummy.rotation.set(0, 0, 0)
+      dummy.updateMatrix()
+      stems.current!.setMatrixAt(index, dummy.matrix)
+      stems.current!.setColorAt(index, beaconColor)
+
+      dummy.position.copy(position)
       dummy.scale.setScalar(Math.max(11, baseScale * 6.2))
       dummy.updateMatrix()
       hitTargets.current!.setMatrixAt(index, dummy.matrix)
     })
 
-    cores.current.instanceMatrix.needsUpdate = true
-    glows.current.instanceMatrix.needsUpdate = true
-    hitTargets.current.instanceMatrix.needsUpdate = true
-    if (cores.current.instanceColor) cores.current.instanceColor.needsUpdate = true
-    if (glows.current.instanceColor) glows.current.instanceColor.needsUpdate = true
-  }, [dummy, positions, systems])
+    markerKinds.unclaimedIndexes.forEach((systemIndex, instanceIndex) => {
+      if (!unclaimedDiamonds.current) return
+      dummy.position.copy(positions[systemIndex])
+      dummy.rotation.set(Math.PI / 2, 0, Math.PI / 4)
+      dummy.scale.setScalar(1)
+      dummy.updateMatrix()
+      unclaimedDiamonds.current.setMatrixAt(instanceIndex, dummy.matrix)
+    })
+
+    markerKinds.blackHoleIndexes.forEach((systemIndex, instanceIndex) => {
+      if (!blackHoleDiscs.current || !blackHoleRings.current) return
+      const system = systems[systemIndex]
+      dummy.position.copy(positions[systemIndex])
+      dummy.rotation.set(Math.PI / 2, 0, 0)
+      dummy.scale.setScalar(1)
+      dummy.updateMatrix()
+      blackHoleDiscs.current.setMatrixAt(instanceIndex, dummy.matrix)
+      blackHoleRings.current.setMatrixAt(instanceIndex, dummy.matrix)
+      blackHoleRings.current.setColorAt(instanceIndex, new THREE.Color(getSystemPrimaryColor(system)))
+    })
+
+    const meshes = [
+      cores.current,
+      glows.current,
+      rings.current,
+      stems.current,
+      hitTargets.current,
+      unclaimedDiamonds.current,
+      blackHoleDiscs.current,
+      blackHoleRings.current,
+    ].filter((mesh): mesh is THREE.InstancedMesh => Boolean(mesh))
+
+    meshes.forEach((mesh) => {
+      mesh.instanceMatrix.needsUpdate = true
+      if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true
+      mesh.computeBoundingSphere()
+    })
+  }, [currentPlayer, dummy, markerKinds, positions, systems])
 
   function resolveInstance(event: ThreeEvent<PointerEvent | MouseEvent>) {
     event.stopPropagation()
@@ -518,101 +665,147 @@ function SystemInstances({ systems, positions, onOpenSystem, onHover }: {
     return () => {
       coreGeometry.dispose()
       glowGeometry.dispose()
+      ringGeometry.dispose()
+      stemGeometry.dispose()
+      unclaimedGeometry.dispose()
+      blackHoleDiscGeometry.dispose()
+      blackHoleRingGeometry.dispose()
       hitGeometry.dispose()
 
       coreMaterial.dispose()
       glowMaterial.dispose()
+      ringMaterial.dispose()
+      stemMaterial.dispose()
+      unclaimedMaterial.dispose()
+      blackHoleDiscMaterial.dispose()
+      blackHoleRingMaterial.dispose()
       hitMaterial.dispose()
     }
   }, [
+    blackHoleDiscGeometry,
+    blackHoleDiscMaterial,
+    blackHoleRingGeometry,
+    blackHoleRingMaterial,
     coreGeometry,
-    glowGeometry,
-    hitGeometry,
     coreMaterial,
+    glowGeometry,
     glowMaterial,
+    hitGeometry,
     hitMaterial,
+    ringGeometry,
+    ringMaterial,
+    stemGeometry,
+    stemMaterial,
+    unclaimedGeometry,
+    unclaimedMaterial,
   ])
 
   return (
     <group>
-      <instancedMesh ref={cores} args={[coreGeometry, coreMaterial, systems.length]} frustumCulled={false} renderOrder={12}
-        onPointerMove={(event) => onHover(resolveInstance(event))} onPointerOut={() => onHover(undefined)}
-        onClick={(event) => { const id = resolveInstance(event); if (id !== undefined) onOpenSystem(systems[id].id) }} />
-      <instancedMesh ref={glows} args={[glowGeometry, glowMaterial, systems.length]} frustumCulled={false} renderOrder={11}
-        onPointerMove={(event) => onHover(resolveInstance(event))} onPointerOut={() => onHover(undefined)}
-        onClick={(event) => { const id = resolveInstance(event); if (id !== undefined) onOpenSystem(systems[id].id) }} />
-      <instancedMesh ref={hitTargets} args={[hitGeometry, hitMaterial, systems.length]} frustumCulled={false} renderOrder={13}
-        onPointerMove={(event) => onHover(resolveInstance(event))} onPointerOut={() => onHover(undefined)}
-        onClick={(event) => { const id = resolveInstance(event); if (id !== undefined) onOpenSystem(systems[id].id) }} />
+      <instancedMesh ref={glows} args={[glowGeometry, glowMaterial, systems.length]} renderOrder={11} />
+      <instancedMesh ref={cores} args={[coreGeometry, coreMaterial, systems.length]} renderOrder={12} />
+      <instancedMesh ref={rings} args={[ringGeometry, ringMaterial, systems.length]} renderOrder={15} />
+      <instancedMesh ref={stems} args={[stemGeometry, stemMaterial, systems.length]} renderOrder={15} />
+
+      {markerKinds.unclaimedIndexes.length > 0 && (
+        <instancedMesh
+          ref={unclaimedDiamonds}
+          args={[unclaimedGeometry, unclaimedMaterial, markerKinds.unclaimedIndexes.length]}
+          renderOrder={15}
+        />
+      )}
+
+      {markerKinds.blackHoleIndexes.length > 0 && (
+        <>
+          <instancedMesh
+            ref={blackHoleDiscs}
+            args={[blackHoleDiscGeometry, blackHoleDiscMaterial, markerKinds.blackHoleIndexes.length]}
+            renderOrder={16}
+          />
+          <instancedMesh
+            ref={blackHoleRings}
+            args={[blackHoleRingGeometry, blackHoleRingMaterial, markerKinds.blackHoleIndexes.length]}
+            renderOrder={17}
+          />
+        </>
+      )}
+
+      {/* Only this low-poly mesh participates in pointer raycasting. */}
+      <instancedMesh
+        ref={hitTargets}
+        args={[hitGeometry, hitMaterial, systems.length]}
+        renderOrder={18}
+        onPointerMove={(event) => onHover(resolveInstance(event))}
+        onPointerOut={() => onHover(undefined)}
+        onClick={(event) => {
+          const id = resolveInstance(event)
+          if (id !== undefined) onOpenSystem(systems[id].id)
+        }}
+      />
     </group>
   )
 }
 
-function SystemBeacon({ system, position, hovered, labelsVisible, currentPlayer, onHover, onOpen }: {
+function HoveredSystemMarker({ system, position, currentPlayer }: {
   system: StarSystem
   position: THREE.Vector3
-  hovered: boolean
-  labelsVisible: boolean
   currentPlayer: PlayerIdentity
-  onHover: (hovered: boolean) => void
-  onOpen: () => void
 }) {
   const ownership = resolveOwnership(system.owner, currentPlayer)
-  const claimed = ownership.relation !== 'unclaimed'
   const tone = ownershipTone(ownership)
   const blackHole = isBlackHoleSystem(system)
-  const beaconColor = blackHole ? getSystemPrimaryColor(system) : claimed ? system.zoneColor ?? '#87dcff' : '#f3bb65'
+  const beaconColor = blackHole
+    ? getSystemPrimaryColor(system)
+    : ownership.relation === 'unclaimed'
+      ? '#f3bb65'
+      : system.zoneColor ?? '#87dcff'
 
   return (
-    <group position={position.toArray()}
-      onPointerOver={(event) => { event.stopPropagation(); onHover(true) }}
-      onPointerOut={() => onHover(false)}
-      onClick={(event) => { event.stopPropagation(); onOpen() }}>
-      <mesh rotation={[Math.PI / 2, 0, 0]} renderOrder={15}>
-        <ringGeometry args={[hovered ? 5.7 : 4.5, hovered ? 6.3 : 5.1, 64]} />
-        <meshBasicMaterial color={hovered ? '#ffffff' : beaconColor} transparent opacity={0.92} side={THREE.DoubleSide} toneMapped={false} depthTest={false} />
+    <group position={position.toArray()}>
+      <mesh rotation={[Math.PI / 2, 0, 0]} renderOrder={20}>
+        <ringGeometry args={[6.1, 7.15, 48]} />
+        <meshBasicMaterial
+          color="#ffffff"
+          transparent
+          opacity={0.96}
+          side={THREE.DoubleSide}
+          toneMapped={false}
+          depthTest={false}
+          depthWrite={false}
+        />
       </mesh>
-      {blackHole ? (
-        <group rotation={[Math.PI / 2, 0, 0]}>
-          <mesh renderOrder={16}>
-            <circleGeometry args={[2.8, 48]} />
-            <meshBasicMaterial color="#000000" toneMapped={false} depthTest={false} />
-          </mesh>
-          <mesh renderOrder={17}>
-            <ringGeometry args={[3.2, 4.1, 64]} />
-            <meshBasicMaterial color={beaconColor} transparent opacity={0.95} side={THREE.DoubleSide} toneMapped={false} depthTest={false} blending={THREE.AdditiveBlending} />
-          </mesh>
-        </group>
-      ) : !claimed && (
-        <mesh rotation={[Math.PI / 2, 0, Math.PI / 4]} renderOrder={15}>
-          <ringGeometry args={[7.2, 7.65, 4]} />
-          <meshBasicMaterial color="#f3bb65" transparent opacity={hovered ? 0.95 : 0.68} side={THREE.DoubleSide} toneMapped={false} depthTest={false} />
-        </mesh>
-      )}
-      <mesh position={[0, 5.2, 0]} renderOrder={15}>
-        <cylinderGeometry args={[0.18, 0.18, 10.4, 8]} />
-        <meshBasicMaterial color={beaconColor} transparent opacity={0.58} toneMapped={false} depthTest={false} />
+
+      <mesh position={[0, 5.2, 0]} renderOrder={20}>
+        <cylinderGeometry args={[0.25, 0.25, 10.4, 8]} />
+        <meshBasicMaterial
+          color={beaconColor}
+          transparent
+          opacity={0.88}
+          toneMapped={false}
+          depthTest={false}
+          depthWrite={false}
+        />
       </mesh>
-      {(labelsVisible || hovered) && (
-        <Html center position={[0, 13, 0]} style={{ pointerEvents: 'none' }}>
-          <div className={`world-label system-label relationship-label relationship-label--${tone} ${hovered ? 'world-label--active' : ''}`}>
-            <strong>{system.name}</strong>
-            <span>
-              {blackHole
-                ? `BLACK HOLE · ${systemOwnershipLabel(ownership)} · click to visit`
-                : ownership.relation === 'unclaimed'
-                  ? `UNCLAIMED · ${system.planets.length} survey worlds · click to inspect`
-                  : `${systemOwnershipLabel(ownership)} · ${system.planets.length} charted worlds · click to visit`}
-            </span>
-          </div>
-        </Html>
-      )}
+
+      <Html center position={[0, 13, 0]} style={{ pointerEvents: 'none' }}>
+        <div className={`world-label system-label relationship-label relationship-label--${tone} world-label--active`}>
+          <strong>{system.name}</strong>
+          <span>
+            {blackHole
+              ? `BLACK HOLE · ${systemOwnershipLabel(ownership)} · click to visit`
+              : ownership.relation === 'unclaimed'
+                ? `UNCLAIMED · ${system.planets.length} survey worlds · click to inspect`
+                : `${systemOwnershipLabel(ownership)} · ${system.planets.length} charted worlds · click to visit`}
+          </span>
+        </div>
+      </Html>
     </group>
   )
 }
 
-function GalacticCoreMarker({ system, labelsVisible, onOpen }: {
+function GalacticCoreMarker({ system, position, labelsVisible, onOpen }: {
   system: StarSystem
+  position: THREE.Vector3
   labelsVisible: boolean
   onOpen: () => void
 }) {
@@ -631,7 +824,7 @@ function GalacticCoreMarker({ system, labelsVisible, onOpen }: {
 
   return (
     <group
-      position={[0, 5, 0]}
+      position={position.toArray()}
       onPointerOver={(event) => {
         event.stopPropagation()
         setHovered(true)
@@ -661,19 +854,6 @@ function GalacticCoreMarker({ system, labelsVisible, onOpen }: {
   )
 }
 
-function ChartedRegion({ center, labelsVisible }: { center: THREE.Vector3; labelsVisible: boolean }) {
-  if (labelsVisible) return null
-
-  return (
-    <Html center position={[center.x, center.y + 88, center.z]} style={{ pointerEvents: 'none' }}>
-      <div className="charted-region-label">
-        <strong>CHARTED REGION</strong>
-        <span>Zoom in to reveal individual systems</span>
-      </div>
-    </Html>
-  )
-}
-
 export function GalaxyScene({ galaxy, systems, trafficRoutes, followRotation, resetOrientationToken, currentPlayer, onLabelsVisibilityChange, onOpenSystem }: {
   galaxy: Galaxy
   systems: StarSystem[]
@@ -690,28 +870,51 @@ export function GalaxyScene({ galaxy, systems, trafficRoutes, followRotation, re
   const labelsVisibleRef = useRef(false)
   const { camera, controls } = useThree()
   useCursor(hoveredIndex !== undefined)
+  const displayScale = useMemo(() => galaxyDisplayScale(galaxy), [galaxy])
   const coreSystems = useMemo(() => systems.filter(isGalacticCoreSystem), [systems])
   const navigableSystems = useMemo(() => systems.filter((system) => !isGalacticCoreSystem(system)), [systems])
-  const positions = useMemo(() => projectSystemPositions(navigableSystems), [navigableSystems])
-  const regionCenter = useMemo(() => chartedRegionCenter(), [])
-  const territoryGroups = useMemo(() => buildTerritoryGroups(navigableSystems, positions), [navigableSystems, positions])
-
-  useEffect(() => {
-    if (rotationRoot.current) rotationRoot.current.rotation.set(0, 0, 0)
-    camera.position.copy(DEFAULT_CAMERA_POSITION)
-    camera.up.set(0, 1, 0)
-    camera.lookAt(DEFAULT_CAMERA_TARGET)
-    camera.updateProjectionMatrix()
-    const orbitControls = controls as OrbitControlsImpl | undefined
-    if (orbitControls) {
-      orbitControls.target.copy(DEFAULT_CAMERA_TARGET)
-      orbitControls.update()
-    }
-  }, [camera, controls, resetOrientationToken])
+  const corePositions = useMemo(
+    () => projectSystemPositions(galaxy, coreSystems),
+    [coreSystems, galaxy],
+  )
+  const positions = useMemo(
+    () => projectSystemPositions(galaxy, navigableSystems),
+    [galaxy, navigableSystems],
+  )
+  const territoryGroups = useMemo(
+    () => buildTerritoryGroups(navigableSystems, positions, displayScale),
+    [displayScale, navigableSystems, positions],
+  )
 
   useEffect(() => {
     onLabelsVisibilityChange?.(labelsVisible)
   }, [labelsVisible, onLabelsVisibilityChange])
+
+  useFrame((_, delta) => {
+    const rotationDelta = delta * GALAXY_ROTATION_SPEED
+    if (rotationRoot.current) rotationRoot.current.rotation.y += rotationDelta
+
+    const orbitControls = controls as OrbitControlsImpl | undefined
+
+    if (followRotation) {
+      camera.position.applyAxisAngle(Y_AXIS, rotationDelta)
+      orbitControls?.target.applyAxisAngle(Y_AXIS, rotationDelta)
+    }
+
+    if (orbitControls) {
+      orbitControls.target.y = 0
+      orbitControls.update()
+    }
+
+    const shouldShowLabels =
+      navigableSystems.length > 0 &&
+      camera.position.distanceTo(DEFAULT_CAMERA_TARGET) < LABEL_VISIBILITY_DISTANCE
+
+    if (shouldShowLabels !== labelsVisibleRef.current) {
+      labelsVisibleRef.current = shouldShowLabels
+      setLabelsVisible(shouldShowLabels)
+    }
+  })
 
   useEffect(() => {
     if (rotationRoot.current) {
@@ -740,30 +943,36 @@ export function GalaxyScene({ galaxy, systems, trafficRoutes, followRotation, re
 
 
 
-
   return (
     <group ref={rotationRoot}>
       <group rotation={[GALAXY_TILT.x, GALAXY_TILT.y, GALAXY_TILT.z]}>
         <MassiveGalaxy galaxy={galaxy} territoryGroups={territoryGroups} />
         <MergedTerritoryMap territoryGroups={territoryGroups} />
         <pointLight position={[0, 8, 0]} color={galaxy.primaryColor} intensity={220} distance={220} />
-        {navigableSystems.length > 0 && <ChartedRegion center={regionCenter} labelsVisible={labelsVisible} />}
-        {coreSystems.map((coreSystem) => (
+        {coreSystems.map((coreSystem, index) => (
           <GalacticCoreMarker
             key={coreSystem.id}
             system={coreSystem}
+            position={corePositions[index]}
             labelsVisible={labelsVisible}
             onOpen={() => onOpenSystem(coreSystem.id)}
           />
         ))}
         <GalaxyTrafficRoutes routes={trafficRoutes} systems={navigableSystems} positions={positions} detailVisible={labelsVisible} />
-        <SystemInstances systems={navigableSystems} positions={positions} onOpenSystem={onOpenSystem} onHover={setHoveredIndex} />
-        {navigableSystems.map((system, index) => (
-          <SystemBeacon key={system.id} system={system} position={positions[index]} hovered={hoveredIndex === index}
-            labelsVisible={labelsVisible} currentPlayer={currentPlayer}
-            onHover={(hovered) => setHoveredIndex(hovered ? index : undefined)}
-            onOpen={() => onOpenSystem(system.id)} />
-        ))}
+        <SystemInstances
+          systems={navigableSystems}
+          positions={positions}
+          currentPlayer={currentPlayer}
+          onOpenSystem={onOpenSystem}
+          onHover={setHoveredIndex}
+        />
+        {hoveredIndex !== undefined && navigableSystems[hoveredIndex] && positions[hoveredIndex] && (
+          <HoveredSystemMarker
+            system={navigableSystems[hoveredIndex]}
+            position={positions[hoveredIndex]}
+            currentPlayer={currentPlayer}
+          />
+        )}
       </group>
     </group>
   )

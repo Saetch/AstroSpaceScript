@@ -13,21 +13,21 @@ function InteractionStreams({ galaxy, hovered }: { galaxy: Galaxy; hovered: bool
   }, [streams])
 
   return (
-    <group>
-      {streams.map((stream) => (
-        <points key={stream.id} geometry={stream.geometry} frustumCulled={false} renderOrder={2}>
-          <pointsMaterial
-            size={hovered ? stream.size * 1.35 : stream.size}
-            sizeAttenuation={false}
-            vertexColors
-            transparent
-            opacity={hovered ? Math.min(1, stream.opacity + 0.16) : stream.opacity}
-            depthWrite={false}
-            blending={THREE.AdditiveBlending}
-          />
-        </points>
-      ))}
-    </group>
+      <group>
+        {streams.map((stream) => (
+            <points key={stream.id} geometry={stream.geometry} frustumCulled={false} renderOrder={2}>
+              <pointsMaterial
+                  size={hovered ? stream.size * 1.35 : stream.size}
+                  sizeAttenuation={false}
+                  vertexColors
+                  transparent
+                  opacity={hovered ? Math.min(1, stream.opacity + 0.16) : stream.opacity}
+                  depthWrite={false}
+                  blending={THREE.AdditiveBlending}
+              />
+            </points>
+        ))}
+      </group>
   )
 }
 
@@ -46,92 +46,92 @@ function GalaxyBody({ galaxy, body, hovered }: {
     return () => geometry.dispose()
   }, [geometry])
   return (
-    <group
-      position={body.offset}
-      rotation={[body.inclination?.[0] ?? 0, body.rotation, body.inclination?.[2] ?? 0]}
-    >
-      <points geometry={geometry} frustumCulled={false}>
-        <pointsMaterial
-          size={hovered ? 1.85 : 1.45}
-          sizeAttenuation={false}
-          vertexColors
-          transparent
-          opacity={hovered ? 0.95 : 0.8}
-          depthWrite={false}
-          blending={THREE.AdditiveBlending}
-        />
-      </points>
-
-      {body.interactionPhase && body.interactionPhase !== 'bound' && (
-        <group>
-          <mesh scale={[body.radius * 0.16, Math.max(body.thickness * 0.42, 2.5), body.radius * 0.16]}>
-            <sphereGeometry args={[1, 32, 20]} />
-            <meshBasicMaterial
-              color={body.secondaryColor}
+      <group
+          position={body.offset}
+          rotation={[body.inclination?.[0] ?? 0, body.rotation, body.inclination?.[2] ?? 0]}
+      >
+        <points geometry={geometry} frustumCulled={false}>
+          <pointsMaterial
+              size={hovered ? 1.85 : 1.45}
+              sizeAttenuation={false}
+              vertexColors
               transparent
-              opacity={hovered ? 0.2 : 0.13}
+              opacity={hovered ? 0.95 : 0.8}
               depthWrite={false}
               blending={THREE.AdditiveBlending}
-              toneMapped={false}
-            />
-          </mesh>
-          <mesh rotation={[-Math.PI / 2, 0, 0]} scale={[body.radius * 0.34, body.radius * 0.22, 1]}>
-            <circleGeometry args={[1, 64]} />
-            <meshBasicMaterial
-              color={body.primaryColor}
-              transparent
-              opacity={hovered ? 0.075 : 0.04}
-              depthWrite={false}
-              blending={THREE.AdditiveBlending}
-              toneMapped={false}
-              side={THREE.DoubleSide}
-            />
-          </mesh>
-        </group>
-      )}
-
-      {body.morphology === 'barred-spiral' && (
-        <group>
-          <mesh rotation={[-Math.PI / 2, 0, 0]} scale={[body.radius * 0.31, body.radius * 0.052, 1]}>
-            <circleGeometry args={[1, 64]} />
-            <meshBasicMaterial
-              color={body.secondaryColor}
-              transparent
-              opacity={hovered ? 0.12 : 0.065}
-              depthWrite={false}
-              blending={THREE.AdditiveBlending}
-              toneMapped={false}
-              side={THREE.DoubleSide}
-            />
-          </mesh>
-          <mesh scale={[body.radius * 0.15, body.thickness * 0.22, body.radius * 0.105]}>
-            <sphereGeometry args={[1, 32, 20]} />
-            <meshBasicMaterial
-              color={body.secondaryColor}
-              transparent
-              opacity={hovered ? 0.17 : 0.095}
-              depthWrite={false}
-              blending={THREE.AdditiveBlending}
-              toneMapped={false}
-            />
-          </mesh>
-        </group>
-      )}
-
-      {!galaxy.companions?.length && (hovered || (galaxy.home && body.primary)) && (
-        <mesh rotation={[Math.PI / 2, 0, 0]} position={[0, -body.thickness * 0.35, 0]}>
-          <ringGeometry args={[body.radius * 1.05, body.radius * 1.09, 128]} />
-          <meshBasicMaterial
-            color={hovered ? '#ffffff' : body.primaryColor}
-            transparent
-            opacity={hovered ? 0.7 : 0.42}
-            side={THREE.DoubleSide}
-            depthWrite={false}
-            toneMapped={false}
           />
-        </mesh>
-      )}
-    </group>
+        </points>
+
+        {body.interactionPhase && body.interactionPhase !== 'bound' && (
+            <group>
+              <mesh scale={[body.radius * 0.16, Math.max(body.thickness * 0.42, 2.5), body.radius * 0.16]}>
+                <sphereGeometry args={[1, 32, 20]} />
+                <meshBasicMaterial
+                    color={body.secondaryColor}
+                    transparent
+                    opacity={hovered ? 0.2 : 0.13}
+                    depthWrite={false}
+                    blending={THREE.AdditiveBlending}
+                    toneMapped={false}
+                />
+              </mesh>
+              <mesh rotation={[-Math.PI / 2, 0, 0]} scale={[body.radius * 0.34, body.radius * 0.22, 1]}>
+                <circleGeometry args={[1, 64]} />
+                <meshBasicMaterial
+                    color={body.primaryColor}
+                    transparent
+                    opacity={hovered ? 0.075 : 0.04}
+                    depthWrite={false}
+                    blending={THREE.AdditiveBlending}
+                    toneMapped={false}
+                    side={THREE.DoubleSide}
+                />
+              </mesh>
+            </group>
+        )}
+
+        {body.morphology === 'barred-spiral' && (
+            <group>
+              <mesh rotation={[-Math.PI / 2, 0, 0]} scale={[body.radius * 0.31, body.radius * 0.052, 1]}>
+                <circleGeometry args={[1, 64]} />
+                <meshBasicMaterial
+                    color={body.secondaryColor}
+                    transparent
+                    opacity={hovered ? 0.12 : 0.065}
+                    depthWrite={false}
+                    blending={THREE.AdditiveBlending}
+                    toneMapped={false}
+                    side={THREE.DoubleSide}
+                />
+              </mesh>
+              <mesh scale={[body.radius * 0.15, body.thickness * 0.22, body.radius * 0.105]}>
+                <sphereGeometry args={[1, 32, 20]} />
+                <meshBasicMaterial
+                    color={body.secondaryColor}
+                    transparent
+                    opacity={hovered ? 0.17 : 0.095}
+                    depthWrite={false}
+                    blending={THREE.AdditiveBlending}
+                    toneMapped={false}
+                />
+              </mesh>
+            </group>
+        )}
+
+        {!galaxy.companions?.length && (hovered || (galaxy.home && body.primary)) && (
+            <mesh rotation={[Math.PI / 2, 0, 0]} position={[0, -body.thickness * 0.35, 0]}>
+              <ringGeometry args={[body.radius * 1.05, body.radius * 1.09, 128]} />
+              <meshBasicMaterial
+                  color={hovered ? '#ffffff' : body.primaryColor}
+                  transparent
+                  opacity={hovered ? 0.7 : 0.42}
+                  side={THREE.DoubleSide}
+                  depthWrite={false}
+                  toneMapped={false}
+              />
+            </mesh>
+        )}
+      </group>
   )
 }
 
@@ -168,66 +168,66 @@ function GalaxyObject({ galaxy, onOpen }: { galaxy: Galaxy; onOpen: () => void }
   }
 
   return (
-    <group
-      ref={root}
-      position={galaxy.position}
-      rotation={[0.1, galaxy.rotation, 0]}
-      onPointerOver={handlePointer}
-      onPointerMove={handlePointer}
-      onPointerOut={() => setHovered(false)}
-      onClick={(event) => {
-        event.stopPropagation()
-        onOpen()
-      }}
-    >
-      <InteractionStreams galaxy={galaxy} hovered={hovered} />
-
-      {bodies.map((body) => (
-        <GalaxyBody key={body.id} galaxy={galaxy} body={body} hovered={hovered} />
-      ))}
-
-      <mesh
-        rotation={[Math.PI / 2, 0, 0]}
-        onPointerOver={handlePointer}
-        onPointerMove={handlePointer}
-        onPointerOut={() => setHovered(false)}
-        onClick={(event) => {
-          event.stopPropagation()
-          onOpen()
-        }}
-      >
-        <circleGeometry args={[hitRadius, 128]} />
-        <meshBasicMaterial
-          color={galaxy.primaryColor}
-          transparent
-          opacity={0.001}
-          depthWrite={false}
-          side={THREE.DoubleSide}
-        />
-      </mesh>
-
-      <Html center position={[0, galaxy.thickness + 26, 0]} style={{ pointerEvents: 'auto' }}>
-        <button
-          type="button"
-          className={`galaxy-overview-label ${hovered ? 'galaxy-overview-label--active' : ''}`}
-          onMouseEnter={() => setHovered(true)}
-          onMouseLeave={() => setHovered(false)}
-          onPointerDown={(event) => event.stopPropagation()}
+      <group
+          ref={root}
+          position={galaxy.position}
+          rotation={[0.1, galaxy.rotation, 0]}
+          onPointerOver={handlePointer}
+          onPointerMove={handlePointer}
+          onPointerOut={() => setHovered(false)}
           onClick={(event) => {
             event.stopPropagation()
             onOpen()
           }}
+      >
+        <InteractionStreams galaxy={galaxy} hovered={hovered} />
+
+        {bodies.map((body) => (
+            <GalaxyBody key={body.id} galaxy={galaxy} body={body} hovered={hovered} />
+        ))}
+
+        <mesh
+            rotation={[Math.PI / 2, 0, 0]}
+            onPointerOver={handlePointer}
+            onPointerMove={handlePointer}
+            onPointerOut={() => setHovered(false)}
+            onClick={(event) => {
+              event.stopPropagation()
+              onOpen()
+            }}
         >
-          <span>{galaxy.home ? 'HOME GALAXY' : galaxy.companions?.length ? 'GALAXY GROUP' : galaxy.morphology.toUpperCase()}</span>
-          <strong>{galaxy.name}</strong>
-          <small>
-            {galaxy.estimatedSystems} systems
-            {galaxy.companions?.length ? ` · ${galaxy.companions.length + 1} members` : ''}
-            {' · open galaxy'}
-          </small>
-        </button>
-      </Html>
-    </group>
+          <circleGeometry args={[hitRadius, 128]} />
+          <meshBasicMaterial
+              color={galaxy.primaryColor}
+              transparent
+              opacity={0.001}
+              depthWrite={false}
+              side={THREE.DoubleSide}
+          />
+        </mesh>
+
+        <Html center position={[0, galaxy.thickness + 26, 0]} style={{ pointerEvents: 'auto' }}>
+          <button
+              type="button"
+              className={`galaxy-overview-label ${hovered ? 'galaxy-overview-label--active' : ''}`}
+              onMouseEnter={() => setHovered(true)}
+              onMouseLeave={() => setHovered(false)}
+              onPointerDown={(event) => event.stopPropagation()}
+              onClick={(event) => {
+                event.stopPropagation()
+                onOpen()
+              }}
+          >
+            <span>{galaxy.home ? 'HOME GALAXY' : galaxy.companions?.length ? 'GALAXY GROUP' : galaxy.morphology.toUpperCase()}</span>
+            <strong>{galaxy.name}</strong>
+            <small>
+              {galaxy.estimatedSystems} systems
+              {galaxy.companions?.length ? ` · ${galaxy.companions.length + 1} members` : ''}
+              {' · open galaxy'}
+            </small>
+          </button>
+        </Html>
+      </group>
   )
 }
 
@@ -236,10 +236,10 @@ export function GalaxyOverviewScene({ galaxies, onOpenGalaxy }: {
   onOpenGalaxy: (galaxyId: string) => void
 }) {
   return (
-    <group rotation={[0.03, -0.08, 0]}>
-      {galaxies.map((galaxy) => (
-        <GalaxyObject key={galaxy.id} galaxy={galaxy} onOpen={() => onOpenGalaxy(galaxy.id)} />
-      ))}
-    </group>
+      <group rotation={[0.03, -0.08, 0]}>
+        {galaxies.map((galaxy) => (
+            <GalaxyObject key={galaxy.id} galaxy={galaxy} onOpen={() => onOpenGalaxy(galaxy.id)} />
+        ))}
+      </group>
   )
 }

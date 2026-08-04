@@ -1,5 +1,4 @@
-import type {Galaxy, Planet, StarSystem, UniverseSnapshot} from '../domain/universe'
-import { mockGalaxies, mockSystems, mockTrafficRoutes } from './mockUniverse'
+import type { Galaxy, Planet, StarSystem, UniverseSnapshot } from '../domain/universe'
 
 export type UniverseListener = () => void
 
@@ -10,6 +9,7 @@ export interface UniverseRepository {
   disconnect(): void
 
   setGalaxies(galaxies: Galaxy[]): void
+  setVisibleData(galaxies: Galaxy[], systems: StarSystem[]): void
   /** Keep a full system record/subscription available while navigating inside it. */
   retainSystem(systemId: string): void
   /** Release a previously retained system after leaving its navigation subtree. */
@@ -68,27 +68,41 @@ function colonizedSystem(system: StarSystem, planetId: string): StarSystem {
   }
 }
 
-export class MockUniverseRepository implements UniverseRepository {
+export class BridgeUniverseRepository implements UniverseRepository {
   private listeners = new Set<UniverseListener>()
   private retainedSystems = new Map<string, number>()
 
+  // Runtime data comes exclusively from the SpacetimeDB visibility views.
+  // Keeping this empty avoids briefly or permanently falling back to the old
+  // handcrafted mock catalog when a subscription has not applied yet.
   private snapshot: UniverseSnapshot = {
-    galaxies: structuredClone(mockGalaxies),
-    systems: structuredClone(mockSystems),
-    trafficRoutes: structuredClone(mockTrafficRoutes),
-    connection: 'mock',
-    updatedAt: new Date().toISOString(),
-    onlinePlayers: 128,
+    galaxies: [],
+    systems: [],
+    trafficRoutes: [],
+    connection: 'connecting',
+    updatedAt: new Date(0).toISOString(),
+    onlinePlayers: 0,
   }
 
   setGalaxies(galaxies: Galaxy[]): void {
     this.snapshot = {
       ...this.snapshot,
-      galaxies: galaxies,
+      galaxies,
       connection: 'live',
       updatedAt: new Date().toISOString(),
     }
-    this.listeners.forEach((listener: UniverseListener): void => {listener()})
+    this.listeners.forEach((listener: UniverseListener): void => { listener() })
+  }
+
+  setVisibleData(galaxies: Galaxy[], systems: StarSystem[]): void {
+    this.snapshot = {
+      ...this.snapshot,
+      galaxies,
+      systems,
+      connection: 'live',
+      updatedAt: new Date().toISOString(),
+    }
+    this.listeners.forEach((listener: UniverseListener): void => { listener() })
   }
 
   getSnapshot = () => this.snapshot
@@ -126,4 +140,4 @@ export class MockUniverseRepository implements UniverseRepository {
   }
 }
 
-export const universeRepository: UniverseRepository = new MockUniverseRepository()
+export const universeRepository: UniverseRepository = new BridgeUniverseRepository()

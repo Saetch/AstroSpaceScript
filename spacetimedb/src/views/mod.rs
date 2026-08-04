@@ -1,2 +1,5 @@
+mod visibility;
 pub mod visible_galaxies;
-mod visible_systems;
+pub mod visible_moons;
+pub mod visible_planets;
+pub mod visible_systems;

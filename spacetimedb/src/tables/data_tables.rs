@@ -92,7 +92,7 @@ pub struct BlackHole {
     pub spin: f32,
 
     pub photon_ring_color: String,
-    pub accretion_disk: AccretionDisk,
+    pub accretion_disk: Option<AccretionDisk>,
 
     pub jet_color: String,
     pub jet_length: f32,
@@ -113,7 +113,12 @@ pub struct StarSystem {
 
     pub name: String,
 
-    /// Coordinates relative to the galaxy.
+    /// Coordinates in the parent galaxy's local space.
+    ///
+    /// - (0, 0, 0) is the galaxy center.
+    /// - x/z use the same units as `Galaxy::radius`.
+    /// - y uses the same units as `Galaxy::thickness`.
+    /// - the galaxy overview position/rotation are not baked into this value.
     pub position: Vec3f,
 
     pub primary_kind: SystemPrimaryKind,

@@ -23,6 +23,29 @@ import "./auth.css";
 const HOST = import.meta.env.VITE_SPACETIMEDB_HOST ?? "ws://localhost:3003";
 const DB_NAME = import.meta.env.VITE_SPACETIMEDB_DB_NAME ?? "rust-project";
 
+function isAuthenticationConnectionError(error: Error): boolean {
+  const message = `${error.name}: ${error.message}`.toLowerCase();
+
+  return [
+    "auth",
+    "credential",
+    "forbidden",
+    "issuer",
+    "jwt",
+    "signature",
+    "token",
+    "unauthorized",
+  ].some((part) => message.includes(part));
+}
+
+function returnToLogin(message: string): void {
+  clearStoredIdToken();
+
+  const url = new URL(window.location.origin);
+  url.searchParams.set("auth_error", message);
+  window.location.replace(url);
+}
+
 function AuthenticatedGame({ token }: { token: string }) {
   const [loggingOut, setLoggingOut] = useState(false);
   const currentPlayer = useMemo(() => ({
@@ -45,6 +68,17 @@ function AuthenticatedGame({ token }: { token: string }) {
         .onDisconnect(() => console.log("Disconnected from SpacetimeDB"))
         .onConnectError((_ctx: ErrorContext, error: Error) => {
           console.error("SpacetimeDB connection failed:", error);
+
+          // auth.sqlite contains the Better Auth users and JWT signing keys.
+          // If that database is recreated, an ID token left in localStorage is
+          // signed by the old key. SpacetimeDB rejects it before client_connected
+          // runs, so no Player row can be inserted. Recover by returning to the
+          // login screen instead of leaving the app stuck with the stale token.
+          if (isAuthenticationConnectionError(error)) {
+            returnToLogin(
+              "Your saved login token is no longer valid. Please sign in again.",
+            );
+          }
         }),
     [token],
   );
@@ -79,7 +113,8 @@ function AuthenticatedGame({ token }: { token: string }) {
 }
 
 async function bootstrap() {
-  let callbackError: string | undefined;
+  const query = new URLSearchParams(window.location.search);
+  let callbackError = query.get("auth_error") ?? undefined;
 
   if (window.location.pathname === "/auth/callback") {
     try {
@@ -87,6 +122,8 @@ async function bootstrap() {
     } catch (cause) {
       callbackError = cause instanceof Error ? cause.message : "Login failed";
     }
+    window.history.replaceState({}, "", "/");
+  } else if (query.has("auth_error")) {
     window.history.replaceState({}, "", "/");
   }
 

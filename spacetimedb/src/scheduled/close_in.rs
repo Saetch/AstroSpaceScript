@@ -74,13 +74,6 @@ fn apply_close_in(ctx: &ReducerContext, delta_seconds: f32) {
         galaxy.position.x -= X_SPEED * delta_seconds;
         galaxy.position.z -= Z_SPEED * delta_seconds;
 
-        log::info!(
-            "delta={:.6}s, position=({}, {})",
-            delta_seconds,
-            galaxy.position.x,
-            galaxy.position.z,
-        );
-
         ctx.db.galaxy().id().update(galaxy);
     }
 }

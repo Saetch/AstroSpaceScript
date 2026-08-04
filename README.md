@@ -597,3 +597,11 @@ The final lens shader renders only the warped capture rather than blending the o
 ## Lensing compositing correction
 
 The system-view lens pass now tags planets and moons as `blackHoleLensingBody` objects. Bodies closer to the camera than the black hole are omitted from the offscreen lens capture and restored for the final depth-tested render. The shader uses the primary point-mass image only, avoiding the mirrored secondary branch that previously made the accretion disc appear twice.
+
+## Local development dependencies
+
+`spacetime dev` starts the root Vite app and the nested `auth-server`. The `predev:services` script installs the auth server's development dependencies when needed, including `tsx`.
+
+## Instanced galaxy system markers
+
+The opened galaxy view renders ordinary system cores, glows, rings, stems, unclaimed markers, black-hole accents, and hit targets through a small set of `THREE.InstancedMesh` objects. Only the invisible low-poly hit-target mesh participates in pointer raycasting. Ordinary system HTML labels are created only for the currently hovered system, preventing a zoomed-in view from mounting hundreds or thousands of DOM overlays.

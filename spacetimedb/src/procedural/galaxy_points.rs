@@ -36,6 +36,13 @@ pub struct SpiralSystemDistributionOptions {
 
     /// Additional radial noise as a fraction of the galaxy radius.
     pub radial_jitter_fraction: f32,
+
+    /// Minimum allowed distance between generated systems, expressed as a
+    /// fraction of the galaxy radius.
+    ///
+    /// For a galaxy radius of 128, the default value of 0.015 produces a
+    /// minimum separation of 1.92 galaxy-local units.
+    pub min_distance_fraction: f32,
 }
 
 impl Default for SpiralSystemDistributionOptions {
@@ -53,6 +60,7 @@ impl Default for SpiralSystemDistributionOptions {
             radial_bias: 0.72,
             min_radius_fraction: 0.06,
             radial_jitter_fraction: 0.012,
+            min_distance_fraction: 0.015,
         }
     }
 }
@@ -250,12 +258,98 @@ pub fn generate_spiral_system_points(
     options: &SpiralSystemDistributionOptions,
     count: usize,
 ) -> Vec<GalaxyPoint2> {
-    (0..count)
-        .map(|index| {
-            generate_spiral_system_point(
-                options,
-                index as u32,
-            )
-        })
-        .collect()
+    if count == 0 {
+        return Vec::new();
+    }
+
+    let minimum_distance = options.radius.max(0.0)
+        * options.min_distance_fraction.clamp(0.0, 1.0);
+
+    if minimum_distance <= f32::EPSILON {
+        return (0..count)
+            .map(|index| {
+                generate_spiral_system_point(
+                    options,
+                    index as u32,
+                )
+            })
+            .collect();
+    }
+
+    let minimum_distance_squared = minimum_distance * minimum_distance;
+    let mut points: Vec<GalaxyPoint2> = Vec::with_capacity(count);
+
+    // Candidate salts form one deterministic stream. A rejected candidate is
+    // simply skipped, so the result stays reproducible without relying on an
+    // ambient RNG inside the WASM module.
+    const MAX_CANDIDATES_PER_SYSTEM: usize = 512;
+    let maximum_candidates = count.saturating_mul(MAX_CANDIDATES_PER_SYSTEM);
+
+    for candidate_index in 0..maximum_candidates {
+        if points.len() == count {
+            break;
+        }
+
+        let candidate = generate_spiral_system_point(
+            options,
+            candidate_index as u32,
+        );
+
+        let separated = points.iter().all(|existing| {
+            let delta_x = candidate.x - existing.x;
+            let delta_z = candidate.z - existing.z;
+
+            delta_x * delta_x + delta_z * delta_z
+                >= minimum_distance_squared
+        });
+
+        if separated {
+            points.push(candidate);
+        }
+    }
+
+    assert_eq!(
+        points.len(),
+        count,
+        "Could only place {} of {} systems with a minimum distance of {:.3}. Lower min_distance_fraction or reduce the requested system count.",
+        points.len(),
+        count,
+        minimum_distance,
+    );
+
+    points
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn generated_systems_respect_minimum_distance() {
+        let options = SpiralSystemDistributionOptions {
+            radius: 128.0,
+            seed: 68_421,
+            ..SpiralSystemDistributionOptions::default()
+        };
+
+        let points = generate_spiral_system_points(&options, 1_500);
+        let minimum_distance =
+            options.radius * options.min_distance_fraction;
+        let minimum_distance_squared =
+            minimum_distance * minimum_distance;
+
+        for first in 0..points.len() {
+            for second in first + 1..points.len() {
+                let delta_x = points[first].x - points[second].x;
+                let delta_z = points[first].z - points[second].z;
+                let distance_squared =
+                    delta_x * delta_x + delta_z * delta_z;
+
+                assert!(
+                    distance_squared >= minimum_distance_squared,
+                    "systems {first} and {second} are too close",
+                );
+            }
+        }
+    }
 }

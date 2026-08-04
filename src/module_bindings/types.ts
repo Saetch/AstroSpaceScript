@@ -10,6 +10,37 @@ import {
   type Infer as __Infer,
 } from "spacetimedb";
 
+export const AccretionDisk = __t.object("AccretionDisk", {
+  innerRadius: __t.f32(),
+  outerRadius: __t.f32(),
+  thickness: __t.f32(),
+  get tilt() {
+    return Vec3F;
+  },
+  innerColor: __t.string(),
+  outerColor: __t.string(),
+  opacity: __t.f32(),
+  luminosity: __t.f32(),
+  rotationSpeed: __t.f32(),
+});
+export type AccretionDisk = __Infer<typeof AccretionDisk>;
+
+export const BlackHole = __t.object("BlackHole", {
+  massSolar: __t.u64(),
+  eventHorizonRadius: __t.f32(),
+  spin: __t.f32(),
+  photonRingColor: __t.string(),
+  get accretionDisk() {
+    return __t.option(AccretionDisk);
+  },
+  jetColor: __t.string(),
+  jetLength: __t.f32(),
+  jetIntensity: __t.f32(),
+  lensingStrength: __t.f32(),
+  lensingRadiusMultiplier: __t.f32(),
+});
+export type BlackHole = __Infer<typeof BlackHole>;
+
 export const CloseInTick = __t.object("CloseInTick", {
   scheduledId: __t.u64(),
   scheduledAt: __t.scheduleAt(),
@@ -55,10 +86,83 @@ export const GameClock = __t.object("GameClock", {
 });
 export type GameClock = __Infer<typeof GameClock>;
 
+export const Moon = __t.object("Moon", {
+  id: __t.string(),
+  planetId: __t.string(),
+  name: __t.string(),
+  moonType: __t.string(),
+  radius: __t.f32(),
+  orbitRadius: __t.f32(),
+  orbitSpeed: __t.f32(),
+  orbitOffset: __t.f32(),
+  color: __t.string(),
+  secondaryColor: __t.option(__t.string()),
+});
+export type Moon = __Infer<typeof Moon>;
+
 export const Person = __t.object("Person", {
   name: __t.string(),
 });
 export type Person = __Infer<typeof Person>;
+
+export const Planet = __t.object("Planet", {
+  id: __t.string(),
+  systemId: __t.string(),
+  name: __t.string(),
+  planetType: __t.string(),
+  radius: __t.f32(),
+  orbitRadius: __t.f32(),
+  orbitSpeed: __t.f32(),
+  orbitOffset: __t.f32(),
+  orbitIndex: __t.u16(),
+  color: __t.string(),
+  secondaryColor: __t.option(__t.string()),
+  get temperature() {
+    return PlanetTemperature;
+  },
+  population: __t.u64(),
+  colonized: __t.bool(),
+  get production() {
+    return __t.option(PlanetProduction);
+  },
+  gravity: __t.f32(),
+  atmosphere: __t.string(),
+  description: __t.string(),
+  discoveredBy: __t.string(),
+  resources: __t.array(__t.string()),
+  axialTilt: __t.f32(),
+  tidallyLocked: __t.bool(),
+  landFraction: __t.option(__t.f32()),
+  ringColor: __t.option(__t.string()),
+});
+export type Planet = __Infer<typeof Planet>;
+
+export const PlanetProduction = __t.object("PlanetProduction", {
+  unit: __t.string(),
+  cycle: __t.string(),
+  industry: __t.u64(),
+  energy: __t.u64(),
+  resources: __t.u64(),
+  fuel: __t.u64(),
+  food: __t.u64(),
+  research: __t.u64(),
+});
+export type PlanetProduction = __Infer<typeof PlanetProduction>;
+
+export const PlanetTemperature = __t.object("PlanetTemperature", {
+  pole: __t.i16(),
+  equator: __t.i16(),
+  substellar: __t.i16(),
+  antistellar: __t.i16(),
+});
+export type PlanetTemperature = __Infer<typeof PlanetTemperature>;
+
+export const PlanetToPlayerVisibility = __t.object("PlanetToPlayerVisibility", {
+  id: __t.u64(),
+  playerId: __t.identity(),
+  planetId: __t.string(),
+});
+export type PlanetToPlayerVisibility = __Infer<typeof PlanetToPlayerVisibility>;
 
 export const Player = __t.object("Player", {
   identity: __t.identity(),
@@ -68,10 +172,127 @@ export const Player = __t.object("Player", {
 });
 export type Player = __Infer<typeof Player>;
 
+export const StarSystem = __t.object("StarSystem", {
+  id: __t.string(),
+  galaxyId: __t.string(),
+  name: __t.string(),
+  get position() {
+    return Vec3F;
+  },
+  get primaryKind() {
+    return SystemPrimaryKind;
+  },
+  get mapRole() {
+    return SystemMapRole;
+  },
+  spectralType: __t.string(),
+  starColor: __t.string(),
+  starRadius: __t.f32(),
+  get blackHole() {
+    return __t.option(BlackHole);
+  },
+  zoneColor: __t.option(__t.string()),
+  zoneRadius: __t.option(__t.f32()),
+  zoneStrength: __t.option(__t.f32()),
+  zoneName: __t.option(__t.string()),
+  ownerIdentity: __t.option(__t.identity()),
+  description: __t.string(),
+  faction: __t.string(),
+  population: __t.u64(),
+});
+export type StarSystem = __Infer<typeof StarSystem>;
+
+export const SurfacePoint = __t.object("SurfacePoint", {
+  id: __t.string(),
+  planetId: __t.string(),
+  label: __t.string(),
+  get kind() {
+    return SurfacePointKind;
+  },
+  latitude: __t.f32(),
+  longitude: __t.f32(),
+  description: __t.string(),
+  get visualType() {
+    return __t.option(SurfaceVisualType);
+  },
+});
+export type SurfacePoint = __Infer<typeof SurfacePoint>;
+
+// The tagged union or sum type for the algebraic type `SurfacePointKind`.
+export const SurfacePointKind = __t.enum("SurfacePointKind", {
+  Mission: __t.unit(),
+  Settlement: __t.unit(),
+  Anomaly: __t.unit(),
+  Resource: __t.unit(),
+});
+export type SurfacePointKind = __Infer<typeof SurfacePointKind>;
+
+// The tagged union or sum type for the algebraic type `SurfaceVisualType`.
+export const SurfaceVisualType = __t.enum("SurfaceVisualType", {
+  SettlementLand: __t.unit(),
+  SettlementWater: __t.unit(),
+  Vault: __t.unit(),
+});
+export type SurfaceVisualType = __Infer<typeof SurfaceVisualType>;
+
+// The tagged union or sum type for the algebraic type `SystemMapRole`.
+export const SystemMapRole = __t.enum("SystemMapRole", {
+  Standard: __t.unit(),
+  GalacticCore: __t.unit(),
+});
+export type SystemMapRole = __Infer<typeof SystemMapRole>;
+
+// The tagged union or sum type for the algebraic type `SystemPrimaryKind`.
+export const SystemPrimaryKind = __t.enum("SystemPrimaryKind", {
+  Star: __t.unit(),
+  BlackHole: __t.unit(),
+});
+export type SystemPrimaryKind = __Infer<typeof SystemPrimaryKind>;
+
+export const SystemToPlayerVisibility = __t.object("SystemToPlayerVisibility", {
+  id: __t.u64(),
+  playerId: __t.identity(),
+  starSystemId: __t.string(),
+});
+export type SystemToPlayerVisibility = __Infer<typeof SystemToPlayerVisibility>;
+
 export const Vec3 = __t.object("Vec3", {
   x: __t.f32(),
   y: __t.f32(),
   z: __t.f32(),
 });
 export type Vec3 = __Infer<typeof Vec3>;
+
+export const Vec3F = __t.object("Vec3F", {
+  x: __t.f32(),
+  y: __t.f32(),
+  z: __t.f32(),
+});
+export type Vec3F = __Infer<typeof Vec3F>;
+
+export const VisibleStarSystem = __t.object("VisibleStarSystem", {
+  id: __t.string(),
+  galaxyId: __t.string(),
+  name: __t.string(),
+  get position() {
+    return Vec3F;
+  },
+  primaryKind: __t.string(),
+  mapRole: __t.string(),
+  spectralType: __t.string(),
+  starColor: __t.string(),
+  starRadius: __t.f32(),
+  get blackHole() {
+    return __t.option(BlackHole);
+  },
+  zoneColor: __t.option(__t.string()),
+  zoneRadius: __t.option(__t.f32()),
+  zoneStrength: __t.option(__t.f32()),
+  zoneName: __t.option(__t.string()),
+  ownerIdentity: __t.option(__t.identity()),
+  description: __t.string(),
+  faction: __t.string(),
+  population: __t.u64(),
+});
+export type VisibleStarSystem = __Infer<typeof VisibleStarSystem>;
 

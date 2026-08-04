@@ -11,6 +11,6 @@ import {
 } from "spacetimedb";
 
 export default {
-  name: __t.identity(),
+  playerId: __t.identity(),
   galaxyId: __t.string(),
 };
