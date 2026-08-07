@@ -16,6 +16,8 @@ pub struct CloseInTick {
     pub scheduled_at: ScheduleAt,
 }
 
+const CLOCK_BROADCAST_INTERVAL_SECONDS: f32 = 0.25;
+
 #[spacetimedb::reducer]
 pub fn run_close_in_tick(ctx: &ReducerContext, _tick: CloseInTick) -> Result<(), String> {
     if !ctx.sender_auth().is_internal() {
@@ -25,21 +27,45 @@ pub fn run_close_in_tick(ctx: &ReducerContext, _tick: CloseInTick) -> Result<(),
     let now = ctx.timestamp;
 
     let Some(mut clock) = ctx.db.game_clock().id().find(0) else {
-        ctx.db.game_clock().insert(GameClock {
-            id: 0,
-            last_tick: now,
-        });
-
+        insert_clocks(ctx);
         return Ok(());
     };
 
-    let delta = now
-        .duration_since(clock.last_tick)
-        .unwrap_or_default();
-
+    let delta = now.duration_since(clock.last_tick).unwrap_or_default();
+    let delta_seconds = delta.as_secs_f64();
     clock.last_tick = now;
-    ctx.db.game_clock().id().update(clock);
+    clock.simulation_time_seconds += delta_seconds * f64::from(clock.time_scale);
 
+    let broadcast_elapsed = now
+        .duration_since(clock.last_broadcast)
+        .unwrap_or_default()
+        .as_secs_f32();
+
+    if broadcast_elapsed >= CLOCK_BROADCAST_INTERVAL_SECONDS {
+        clock.last_broadcast = now;
+        let next_revision = ctx
+            .db
+            .simulation_clock()
+            .id()
+            .find(0)
+            .map(|sample| sample.revision.saturating_add(1))
+            .unwrap_or(1);
+
+        let sample = SimulationClock {
+            id: 0,
+            simulation_time_seconds: clock.simulation_time_seconds,
+            time_scale: clock.time_scale,
+            revision: next_revision,
+        };
+
+        if ctx.db.simulation_clock().id().find(0).is_some() {
+            ctx.db.simulation_clock().id().update(sample);
+        } else {
+            ctx.db.simulation_clock().insert(sample);
+        }
+    }
+
+    ctx.db.game_clock().id().update(clock);
     apply_close_in(ctx, delta.as_secs_f32());
 
     Ok(())
@@ -47,9 +73,14 @@ pub fn run_close_in_tick(ctx: &ReducerContext, _tick: CloseInTick) -> Result<(),
 
 pub(crate) fn ensure_close_in_loop(ctx: &ReducerContext) {
     if ctx.db.game_clock().id().find(0).is_none() {
-        ctx.db.game_clock().insert(GameClock {
+        insert_clocks(ctx);
+    } else if ctx.db.simulation_clock().id().find(0).is_none() {
+        let clock = ctx.db.game_clock().id().find(0).expect("clock exists");
+        ctx.db.simulation_clock().insert(SimulationClock {
             id: 0,
-            last_tick: ctx.timestamp,
+            simulation_time_seconds: clock.simulation_time_seconds,
+            time_scale: clock.time_scale,
+            revision: 0,
         });
     }
 
@@ -59,6 +90,23 @@ pub(crate) fn ensure_close_in_loop(ctx: &ReducerContext) {
             scheduled_at: ScheduleAt::Interval(Duration::from_millis(15).into()),
         });
     }
+}
+
+fn insert_clocks(ctx: &ReducerContext) {
+    let clock = GameClock {
+        id: 0,
+        last_tick: ctx.timestamp,
+        last_broadcast: ctx.timestamp,
+        simulation_time_seconds: 0.0,
+        time_scale: 1.0,
+    };
+    ctx.db.game_clock().insert(clock);
+    ctx.db.simulation_clock().insert(SimulationClock {
+        id: 0,
+        simulation_time_seconds: 0.0,
+        time_scale: 1.0,
+        revision: 0,
+    });
 }
 
 fn apply_close_in(ctx: &ReducerContext, delta_seconds: f32) {

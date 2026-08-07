@@ -22,6 +22,8 @@ import type {
   Vector3Tuple,
 } from '../domain/universe'
 import { universeRepository } from './UniverseRepository'
+import { applySimulationClockSample } from '../spatial/simulationClock'
+import { resolveSystemInfluence } from '../domain/systemInfluence'
 
 function convertGalaxy(row: GalaxyRow): Galaxy {
   const inclination: Vector3Tuple | undefined = row.inclination
@@ -93,6 +95,10 @@ function convertMoon(row: MoonRow): Moon {
     orbitRadius: row.orbitRadius,
     orbitSpeed: row.orbitSpeed,
     orbitOffset: row.orbitOffset,
+    orbitInclination: row.orbitInclination,
+    orbitEccentricity: row.orbitEccentricity,
+    orbitLongitude: row.orbitLongitude,
+    orbitArgument: row.orbitArgument,
     color: row.color,
     secondaryColor: row.secondaryColor,
   }
@@ -123,6 +129,10 @@ function convertPlanet(row: PlanetRow, moons: Moon[]): Planet {
     orbitRadius: row.orbitRadius,
     orbitSpeed: row.orbitSpeed,
     orbitOffset: row.orbitOffset,
+    orbitInclination: row.orbitInclination,
+    orbitEccentricity: row.orbitEccentricity,
+    orbitLongitude: row.orbitLongitude,
+    orbitArgument: row.orbitArgument,
     orbitIndex: row.orbitIndex,
     color: row.color,
     secondaryColor: row.secondaryColor ?? row.color,
@@ -152,6 +162,16 @@ function convertPlanet(row: PlanetRow, moons: Moon[]): Planet {
 }
 
 function convertSystem(row: StarSystemRow, planets: Planet[]): StarSystem {
+  const blackHole = convertBlackHole(row.blackHole)
+  const influence = resolveSystemInfluence({
+    primaryMassSolar: row.primaryMassSolar,
+    influenceRadius: row.influenceRadius,
+    influenceStrength: row.influenceStrength,
+    starRadius: row.starRadius,
+    spectralType: row.spectralType,
+    blackHole,
+  })
+
   return {
     id: row.id,
     galaxyId: row.galaxyId,
@@ -162,7 +182,10 @@ function convertSystem(row: StarSystemRow, planets: Planet[]): StarSystem {
     spectralType: row.spectralType,
     starColor: row.starColor,
     starRadius: row.starRadius,
-    blackHole: convertBlackHole(row.blackHole),
+    primaryMassSolar: influence.primaryMassSolar,
+    influenceRadius: influence.influenceRadius,
+    influenceStrength: influence.influenceStrength,
+    blackHole,
     zoneColor: row.zoneColor,
     zoneRadius: row.zoneRadius,
     zoneStrength: row.zoneStrength,
@@ -182,6 +205,7 @@ export function UniverseSpaceTimeBridge() {
   const [systemRows, systemsReady] = useTable(tables.visible_systems)
   const [planetRows, planetsReady] = useTable(tables.visible_planets)
   const [moonRows, moonsReady] = useTable(tables.visible_moons)
+  const [clockRows] = useTable(tables.simulationClock)
 
   const galaxies = useMemo(
     () => galaxyRows.map(convertGalaxy),
@@ -197,6 +221,10 @@ export function UniverseSpaceTimeBridge() {
       if (moons) moons.push(moon)
       else result.set(row.planetId, [moon])
     })
+
+    for (const moons of result.values()) {
+      moons.sort((left, right) => left.orbitRadius - right.orbitRadius)
+    }
 
     return result
   }, [moonRows])
@@ -222,6 +250,17 @@ export function UniverseSpaceTimeBridge() {
     () => systemRows.map((row) => convertSystem(row, planetsBySystemId.get(row.id) ?? [])),
     [planetsBySystemId, systemRows],
   )
+
+
+  useEffect(() => {
+    const sample = clockRows[0]
+    if (!sample) return
+    applySimulationClockSample({
+      simulationTimeSeconds: sample.simulationTimeSeconds,
+      timeScale: sample.timeScale,
+      revision: sample.revision,
+    })
+  }, [clockRows])
 
   useEffect(() => {
     if (!galaxiesReady || !systemsReady || !planetsReady || !moonsReady) return

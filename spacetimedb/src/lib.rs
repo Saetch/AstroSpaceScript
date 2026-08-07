@@ -6,6 +6,7 @@ pub mod reducers;
 pub mod scheduled;
 pub mod tables;
 pub mod types;
+pub mod spatial;
 
 pub mod admin;
 pub mod views;

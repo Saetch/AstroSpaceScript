@@ -19,6 +19,10 @@ export default __t.row({
   orbitRadius: __t.f32().name("orbit_radius"),
   orbitSpeed: __t.f32().name("orbit_speed"),
   orbitOffset: __t.f32().name("orbit_offset"),
+  orbitInclination: __t.f32().name("orbit_inclination"),
+  orbitEccentricity: __t.f32().name("orbit_eccentricity"),
+  orbitLongitude: __t.f32().name("orbit_longitude"),
+  orbitArgument: __t.f32().name("orbit_argument"),
   color: __t.string(),
   secondaryColor: __t.option(__t.string()).name("secondary_color"),
 });

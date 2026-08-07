@@ -154,8 +154,14 @@ export interface Moon {
   orbitRadius: number
   orbitSpeed: number
   orbitOffset: number
-  /** Orbital-plane inclination in degrees, supplied by the backend. */
+  /** Orbital-plane inclination in radians, supplied by the backend. */
   orbitInclination?: number
+  /** Ellipse eccentricity generated and stored by the backend (0 = circular). */
+  orbitEccentricity?: number
+  /** Longitude of the ascending node, in radians. */
+  orbitLongitude?: number
+  /** Rotation of periapsis inside the tilted orbital plane, in radians. */
+  orbitArgument?: number
   color: string
   secondaryColor?: string
   colonized?: boolean
@@ -171,8 +177,14 @@ export interface Planet {
   orbitRadius: number
   orbitSpeed: number
   orbitOffset: number
-  /** Orbital-plane inclination in degrees, supplied by the backend. */
+  /** Orbital-plane inclination in radians, supplied by the backend. */
   orbitInclination?: number
+  /** Ellipse eccentricity generated and stored by the backend (0 = circular). */
+  orbitEccentricity?: number
+  /** Longitude of the ascending node, in radians. */
+  orbitLongitude?: number
+  /** Rotation of periapsis inside the tilted orbital plane, in radians. */
+  orbitArgument?: number
   orbitIndex?: number
   color: string
   secondaryColor: string
@@ -207,6 +219,12 @@ export interface StarSystem {
   spectralType: string
   starColor: string
   starRadius: number
+  /** Canonical primary mass in solar masses, supplied by the backend. */
+  primaryMassSolar: number
+  /** Base territorial reach in galaxy-local map units. */
+  influenceRadius: number
+  /** Dimensionless influence source strength. */
+  influenceStrength: number
   blackHole?: BlackHoleConfig
   zoneColor?: string
   zoneRadius?: number

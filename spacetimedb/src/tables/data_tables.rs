@@ -18,6 +18,21 @@ pub struct GameClock {
     pub id: u8,
 
     pub last_tick: Timestamp,
+    pub last_broadcast: Timestamp,
+    pub simulation_time_seconds: f64,
+    pub time_scale: f32,
+}
+
+/// Low-frequency authoritative clock sample replicated to clients.
+/// Clients extrapolate between samples instead of receiving per-frame positions.
+#[spacetimedb::table(accessor = simulation_clock, public)]
+pub struct SimulationClock {
+    #[primary_key]
+    pub id: u8,
+
+    pub simulation_time_seconds: f64,
+    pub time_scale: f32,
+    pub revision: u64,
 }
 
 #[spacetimedb::table(accessor = person, public)]
@@ -128,6 +143,18 @@ pub struct StarSystem {
     pub star_color: String,
     pub star_radius: f32,
 
+    /// Primary mass in solar masses. This is the canonical value for both
+    /// ordinary stars and black-hole primaries.
+    pub primary_mass_solar: f32,
+
+    /// Base territorial reach in galaxy-local map units. It is derived from
+    /// primary mass with a sub-linear curve so massive stars matter without
+    /// dominating an entire galaxy.
+    pub influence_radius: f32,
+
+    /// Dimensionless source strength paired with `influence_radius`.
+    pub influence_strength: f32,
+
     pub black_hole: Option<BlackHole>,
 
     pub zone_color: Option<String>,
@@ -180,9 +207,17 @@ pub struct Planet {
 
     pub radius: f32,
 
+    /// Semi-major axis in the parent system's local units.
     pub orbit_radius: f32,
+    /// Radians per simulation second.
     pub orbit_speed: f32,
+    /// Phase at simulation t=0, in radians.
     pub orbit_offset: f32,
+    /// All orbital orientation angles are radians.
+    pub orbit_inclination: f32,
+    pub orbit_eccentricity: f32,
+    pub orbit_longitude: f32,
+    pub orbit_argument: f32,
     pub orbit_index: u16,
 
     pub color: String,
@@ -225,9 +260,17 @@ pub struct Moon {
 
     pub radius: f32,
 
+    /// Semi-major axis in the parent planet's local units.
     pub orbit_radius: f32,
+    /// Radians per simulation second.
     pub orbit_speed: f32,
+    /// Phase at simulation t=0, in radians.
     pub orbit_offset: f32,
+    /// All orbital orientation angles are radians.
+    pub orbit_inclination: f32,
+    pub orbit_eccentricity: f32,
+    pub orbit_longitude: f32,
+    pub orbit_argument: f32,
 
     pub color: String,
     pub secondary_color: Option<String>,

@@ -58,8 +58,8 @@ function colonizedSystem(system: StarSystem, planetId: string): StarSystem {
   return {
     ...system,
     zoneColor: system.zoneColor ?? '#45c7ff',
-    zoneRadius: system.zoneRadius ?? 28,
-    zoneStrength: system.zoneStrength ?? 0.24,
+    zoneRadius: system.zoneRadius ?? system.influenceRadius,
+    zoneStrength: system.zoneStrength ?? system.influenceStrength,
     zoneName: system.zoneName ?? 'Atlas Compact',
     owner: system.owner ?? { isCurrentPlayer: true },
     faction: system.faction === 'Unclaimed' ? 'Atlas Compact Colony' : system.faction,

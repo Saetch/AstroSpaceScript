@@ -1,15 +1,6 @@
 import { PlayerRelation, type Galaxy, type Moon, type PlayerOwnership, type StarSystem, type TrafficRoute } from '../domain/universe'
 
 
-function mockOrbitInclination(id: string) {
-  let hash = 2166136261
-  for (let index = 0; index < id.length; index += 1) {
-    hash ^= id.charCodeAt(index)
-    hash = Math.imul(hash, 16777619)
-  }
-  const normalized = (hash >>> 0) / 4294967295
-  return Number((-5 + normalized * 15).toFixed(1))
-}
 
 function mockMoon(
   id: string,
@@ -30,7 +21,6 @@ function mockMoon(
     orbitRadius,
     orbitSpeed,
     orbitOffset,
-    orbitInclination: mockOrbitInclination(`moon:${id}`),
     color,
     secondaryColor,
   }
@@ -119,6 +109,9 @@ const mockSystemDefinitions: StarSystem[] = [
     spectralType: 'Supermassive Kerr black hole',
     starColor: '#ffb36b',
     starRadius: 3.8,
+    primaryMassSolar: 6_800_000_000,
+    influenceRadius: 96,
+    influenceStrength: 1.6,
     blackHole: {
       massSolar: 6800000000,
       eventHorizonRadius: 3.8,
@@ -154,6 +147,9 @@ const mockSystemDefinitions: StarSystem[] = [
     spectralType: 'G2V yellow dwarf',
     starColor: '#ffd98a',
     starRadius: 1.15,
+    primaryMassSolar: 1,
+    influenceRadius: 38,
+    influenceStrength: 0.54,
     zoneColor: '#45c7ff',
     zoneRadius: 42,
     zoneStrength: 1.35,
@@ -262,6 +258,9 @@ const mockSystemDefinitions: StarSystem[] = [
     spectralType: 'K4V orange dwarf',
     starColor: '#ff9e59',
     starRadius: 0.95,
+    primaryMassSolar: 0.7,
+    influenceRadius: 36.2,
+    influenceStrength: 0.51,
     zoneColor: '#45c7ff',
     zoneRadius: 38,
     zoneStrength: 1.05,
@@ -367,6 +366,9 @@ const mockSystemDefinitions: StarSystem[] = [
     spectralType: 'A7V white main-sequence',
     starColor: '#dbe8ff',
     starRadius: 1.45,
+    primaryMassSolar: 1.8,
+    influenceRadius: 41.5,
+    influenceStrength: 0.59,
     zoneColor: '#45c7ff',
     zoneRadius: 36,
     zoneStrength: 0.92,
@@ -470,6 +472,9 @@ const mockSystemDefinitions: StarSystem[] = [
     spectralType: 'M3V red dwarf',
     starColor: '#ff665c',
     starRadius: 0.72,
+    primaryMassSolar: 0.3,
+    influenceRadius: 32.7,
+    influenceStrength: 0.45,
     zoneColor: '#45c7ff',
     zoneRadius: 34,
     zoneStrength: 0.78,
@@ -571,6 +576,9 @@ const mockSystemDefinitions: StarSystem[] = [
     spectralType: 'F8V yellow-white dwarf',
     starColor: '#fff0c4',
     starRadius: 1.22,
+    primaryMassSolar: 1.1,
+    influenceRadius: 38.5,
+    influenceStrength: 0.55,
     zoneColor: '#45c7ff',
     zoneRadius: 44,
     zoneStrength: 1.08,
@@ -966,17 +974,7 @@ const mockSystemDefinitions: StarSystem[] = [
 ]
 
 
-export const mockSystems: StarSystem[] = mockSystemDefinitions.map((system) => ({
-  ...system,
-  planets: system.planets.map((planet) => ({
-    ...planet,
-    orbitInclination: planet.orbitInclination ?? mockOrbitInclination(`planet:${system.id}:${planet.id}`),
-    moons: planet.moons?.map((moon) => ({
-      ...moon,
-      orbitInclination: moon.orbitInclination ?? mockOrbitInclination(`moon:${system.id}:${planet.id}:${moon.id}`),
-    })),
-  })),
-}))
+export const mockSystems: StarSystem[] = mockSystemDefinitions
 
 
 /** Backend-shaped traffic records used by the mock repository. */

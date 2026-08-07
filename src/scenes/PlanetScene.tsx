@@ -16,6 +16,9 @@ import { MoonSystem } from '../components/MoonSystem'
 import { MoonFocusController, type MoonFocusTarget } from '../components/MoonFocusController'
 import { BlackHoleLensingPass } from '../components/BlackHoleLensingPass'
 import { getSystemPrimaryColor, getSystemPrimaryRadius, isBlackHoleSystem, isGalacticCoreSystem, SystemPrimaryVisual } from '../components/SystemPrimary'
+import { MOON_UNITS_TO_INSPECTION_WORLD, PLANET_RADIUS_TO_INSPECTION_WORLD } from '../spatial/renderScales'
+import { orbitPositionAtTime, planetOrbitDefinition } from '../spatial/orbit'
+import { getSimulationTimeSeconds } from '../spatial/simulationClock'
 
 function seededRandom(seed: number) {
   let state = seed >>> 0
@@ -512,33 +515,80 @@ function LatitudeBands({ radius }: { radius: number }) {
   )
 }
 
-function getInspectionPrimaryLayout(system: StarSystem, planet: Planet) {
-  const direction = new THREE.Vector3(-0.12, 0.04, -1).normalize()
-  const distance = THREE.MathUtils.clamp(72 + planet.orbitRadius * 16, 120, 220)
+const INSPECTION_PRIMARY_SKY_DISTANCE = 1200
+
+function getInspectionPrimaryDirection(planet: Planet, simulationTimeSeconds: number) {
+  const position = orbitPositionAtTime(
+      planetOrbitDefinition(planet),
+      simulationTimeSeconds,
+  )
+  const direction = new THREE.Vector3(-position[0], -position[1], -position[2])
+  if (direction.lengthSq() < 0.000001) direction.set(-0.5, 0.22, -1)
+  return direction.normalize()
+}
+
+function getInspectionPrimaryScale(system: StarSystem, planet: Planet) {
   const primaryRadius = getSystemPrimaryRadius(system)
-  // Preserve the primary's apparent angular size: nearby planets see a larger star,
-  // while remote planets see a genuinely tiny one. Clamp only the extreme ends.
   const angularRadius = THREE.MathUtils.clamp(
       (primaryRadius / Math.max(planet.orbitRadius, 0.1)) * 0.16,
       0.004,
       0.07,
   )
-  const visualRadius = distance * angularRadius
-
-  return {
-    position: direction.multiplyScalar(distance),
-    distance,
-    visualRadius,
-    scale: visualRadius / Math.max(primaryRadius, 0.001),
-  }
+  const visualRadius = INSPECTION_PRIMARY_SKY_DISTANCE * angularRadius
+  return visualRadius / Math.max(primaryRadius, 0.001)
 }
 
-function InspectionPrimary({ system, planet }: { system: StarSystem; planet: Planet }) {
-  const layout = useMemo(() => getInspectionPrimaryLayout(system, planet), [planet, system])
+function InspectionPrimary({
+  system,
+  planet,
+  direction,
+}: {
+  system: StarSystem
+  planet: Planet
+  direction: THREE.Vector3
+}) {
+  const group = useRef<THREE.Group>(null)
+  const scale = useMemo(() => getInspectionPrimaryScale(system, planet), [planet, system])
+  const initialPosition = useMemo(
+      () => direction.clone().multiplyScalar(INSPECTION_PRIMARY_SKY_DISTANCE).toArray(),
+      [direction],
+  )
+
+  useFrame(({ camera }) => {
+    if (!group.current) return
+    group.current.position
+        .copy(camera.position)
+        .addScaledVector(direction, INSPECTION_PRIMARY_SKY_DISTANCE)
+  })
+
   return (
-      <group position={layout.position.toArray()}>
-        <SystemPrimaryVisual system={system} scale={layout.scale} detail="inspection" />
+      <group
+          ref={group}
+          position={initialPosition}
+      >
+        <SystemPrimaryVisual system={system} scale={scale} detail="inspection" />
       </group>
+  )
+}
+
+function InspectionPrimaryLight({
+  system,
+  direction,
+}: {
+  system: StarSystem
+  direction: THREE.Vector3
+}) {
+  const position = useMemo(
+      () => direction.clone().multiplyScalar(1000).toArray(),
+      [direction],
+  )
+
+  return (
+      <directionalLight
+          position={position}
+          intensity={5.1}
+          color={getSystemPrimaryColor(system)}
+      />
   )
 }
 
@@ -664,7 +714,10 @@ export function PlanetScene({
   const spinGroup = useRef<THREE.Group>(null)
   const [focusedMoon, setFocusedMoon] = useState<MoonFocusTarget>()
   const tidallyLocked = planet.tidallyLocked ?? planet.type.toLowerCase().includes('tidally locked')
-  const inspectionPrimaryLayout = useMemo(() => getInspectionPrimaryLayout(system, planet), [planet, system])
+  const inspectionPrimaryDirection = useMemo(
+      () => getInspectionPrimaryDirection(planet, getSimulationTimeSeconds()),
+      [planet],
+  )
   const lockedInspectionYaw = useMemo(() => {
     // The procedural climate uses texture-space +X as the substellar point.
     // Three.js SphereGeometry displays that longitude on mesh-local -X, so
@@ -673,16 +726,15 @@ export function PlanetScene({
     const tilt = new THREE.Quaternion().setFromEuler(
         new THREE.Euler(0.08, 0, THREE.MathUtils.degToRad(planet.axialTilt)),
     )
-    const localSunDirection = inspectionPrimaryLayout.position
+    const localSunDirection = inspectionPrimaryDirection
         .clone()
-        .normalize()
         .applyQuaternion(tilt.invert())
     return yawForSubstellarMeshAxis(localSunDirection.x, localSunDirection.z)
-  }, [inspectionPrimaryLayout, planet.axialTilt])
-  const radius = planet.radius * 2.25
+  }, [inspectionPrimaryDirection, planet.axialTilt])
+  const radius = planet.radius * PLANET_RADIUS_TO_INSPECTION_WORLD
   const inspectionLensingRadius = isBlackHoleSystem(system)
       ? (system.blackHole?.accretionDisk?.outerRadius ?? getSystemPrimaryRadius(system) * 4)
-      * inspectionPrimaryLayout.scale
+      * getInspectionPrimaryScale(system, planet)
       * (system.blackHole?.lensingRadiusMultiplier ?? (isGalacticCoreSystem(system) ? 1.18 : 1.0))
       : 0
   const inspectionLensingStrength = system.blackHole?.lensingStrength
@@ -697,12 +749,19 @@ export function PlanetScene({
       <group>
         {isBlackHoleSystem(system) && (
             <BlackHoleLensingPass
-                worldPosition={inspectionPrimaryLayout.position.toArray() as [number, number, number]}
+                worldPosition={inspectionPrimaryDirection
+                    .clone()
+                    .multiplyScalar(INSPECTION_PRIMARY_SKY_DISTANCE)
+                    .toArray() as [number, number, number]}
                 influenceRadius={inspectionLensingRadius}
                 strength={inspectionLensingStrength}
             />
         )}
-        <InspectionPrimary system={system} planet={planet} />
+        <InspectionPrimary
+            system={system}
+            planet={planet}
+            direction={inspectionPrimaryDirection}
+        />
         <ambientLight intensity={0.2} />
         <hemisphereLight color="#cbdcff" groundColor="#090d19" intensity={0.38} />
         <group
@@ -774,7 +833,10 @@ export function PlanetScene({
             onClear={() => setFocusedMoon(undefined)}
             distanceMultiplier={8}
         />
-        <directionalLight position={inspectionPrimaryLayout.position.toArray()} intensity={5.1} color={getSystemPrimaryColor(system)} />
+        <InspectionPrimaryLight
+            system={system}
+            direction={inspectionPrimaryDirection}
+        />
         <pointLight position={[-5, -2, -4]} intensity={1.7} color="#4d79ff" />
       </group>
   )

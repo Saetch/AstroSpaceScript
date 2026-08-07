@@ -43,6 +43,7 @@ import * as CountProcedure from "./count_procedure";
 
 // Import all table schema definitions
 import PersonRow from "./person_table";
+import SimulationClockRow from "./simulation_clock_table";
 import VisibleGalaxiesRow from "./visible_galaxies_table";
 import VisibleMoonsRow from "./visible_moons_table";
 import VisiblePlanetsRow from "./visible_planets_table";
@@ -59,6 +60,17 @@ const tablesSchema = __schema({
     constraints: [
     ],
   }, PersonRow),
+  simulationClock: __table({
+    name: 'simulation_clock',
+    indexes: [
+      { accessor: 'id', name: 'simulation_clock_id_idx_btree', algorithm: 'btree', columns: [
+        'id',
+      ] },
+    ],
+    constraints: [
+      { name: 'simulation_clock_id_key', constraint: 'unique', columns: ['id'] },
+    ],
+  }, SimulationClockRow),
   visibleGalaxies: __table({
     name: 'visible_galaxies',
     indexes: [
@@ -103,6 +115,8 @@ const proceduresSchema = __procedures(
 
 type __SchemaWithTableAccessorAliases = Omit<typeof tablesSchema.schemaType, "tables"> & {
   tables: typeof tablesSchema.schemaType.tables & {
+    /** @deprecated Use `simulationClock` instead. This alias will be removed in the next major version. */
+    readonly "simulation_clock": Omit<typeof tablesSchema.schemaType.tables["simulationClock"], "accessorName"> & { readonly accessorName: "simulation_clock" };
     /** @deprecated Use `visibleGalaxies` instead. This alias will be removed in the next major version. */
     readonly "visible_galaxies": Omit<typeof tablesSchema.schemaType.tables["visibleGalaxies"], "accessorName"> & { readonly accessorName: "visible_galaxies" };
     /** @deprecated Use `visibleMoons` instead. This alias will be removed in the next major version. */
@@ -129,6 +143,7 @@ const REMOTE_MODULE = {
 >;
 
 const tableAccessorAliases = {
+  "simulation_clock": "simulationClock",
   "visible_galaxies": "visibleGalaxies",
   "visible_moons": "visibleMoons",
   "visible_planets": "visiblePlanets",
@@ -153,6 +168,8 @@ function __withTableAccessorAliases<T extends object>(target: T, freeze = false)
 
 type __DbViewBase = __DbConnectionImpl<typeof REMOTE_MODULE>["db"];
 export type DbView = __DbViewBase & {
+  /** @deprecated Use `simulationClock` instead. This alias will be removed in the next major version. */
+  readonly "simulation_clock": __DbViewBase["simulationClock"];
   /** @deprecated Use `visibleGalaxies` instead. This alias will be removed in the next major version. */
   readonly "visible_galaxies": __DbViewBase["visibleGalaxies"];
   /** @deprecated Use `visibleMoons` instead. This alias will be removed in the next major version. */
@@ -165,6 +182,8 @@ export type DbView = __DbViewBase & {
 
 type __TablesBase = __QueryBuilder<typeof tablesSchema.schemaType>;
 export type Tables = __TablesBase & {
+  /** @deprecated Use `simulationClock` instead. This alias will be removed in the next major version. */
+  readonly "simulation_clock": __TablesBase["simulationClock"];
   /** @deprecated Use `visibleGalaxies` instead. This alias will be removed in the next major version. */
   readonly "visible_galaxies": __TablesBase["visibleGalaxies"];
   /** @deprecated Use `visibleMoons` instead. This alias will be removed in the next major version. */

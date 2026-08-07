@@ -83,6 +83,9 @@ export type GalaxyToPlayerVisibility = __Infer<typeof GalaxyToPlayerVisibility>;
 export const GameClock = __t.object("GameClock", {
   id: __t.u8(),
   lastTick: __t.timestamp(),
+  lastBroadcast: __t.timestamp(),
+  simulationTimeSeconds: __t.f64(),
+  timeScale: __t.f32(),
 });
 export type GameClock = __Infer<typeof GameClock>;
 
@@ -95,6 +98,10 @@ export const Moon = __t.object("Moon", {
   orbitRadius: __t.f32(),
   orbitSpeed: __t.f32(),
   orbitOffset: __t.f32(),
+  orbitInclination: __t.f32(),
+  orbitEccentricity: __t.f32(),
+  orbitLongitude: __t.f32(),
+  orbitArgument: __t.f32(),
   color: __t.string(),
   secondaryColor: __t.option(__t.string()),
 });
@@ -114,6 +121,10 @@ export const Planet = __t.object("Planet", {
   orbitRadius: __t.f32(),
   orbitSpeed: __t.f32(),
   orbitOffset: __t.f32(),
+  orbitInclination: __t.f32(),
+  orbitEccentricity: __t.f32(),
+  orbitLongitude: __t.f32(),
+  orbitArgument: __t.f32(),
   orbitIndex: __t.u16(),
   color: __t.string(),
   secondaryColor: __t.option(__t.string()),
@@ -171,6 +182,14 @@ export const Player = __t.object("Player", {
   username: __t.string(),
 });
 export type Player = __Infer<typeof Player>;
+
+export const SimulationClock = __t.object("SimulationClock", {
+  id: __t.u8(),
+  simulationTimeSeconds: __t.f64(),
+  timeScale: __t.f32(),
+  revision: __t.u64(),
+});
+export type SimulationClock = __Infer<typeof SimulationClock>;
 
 export const StarSystem = __t.object("StarSystem", {
   id: __t.string(),

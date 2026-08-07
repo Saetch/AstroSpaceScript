@@ -113,7 +113,10 @@ function buildTerritoryGroups(
   const groups = new Map<string, TerritoryGroup>()
 
   systems.forEach((system, index) => {
-    if (!system.zoneColor || !system.zoneRadius) return
+    if (!system.zoneColor) return
+    const influenceRadius = system.zoneRadius ?? system.influenceRadius
+    const influenceStrength = system.zoneStrength ?? system.influenceStrength
+    if (!influenceRadius) return
     const color = new THREE.Color(system.zoneColor)
     const visualColorKey = `#${color.getHexString()}`
     const colorKey = `${visualColorKey}:${ownershipKey(system.owner)}`
@@ -122,8 +125,8 @@ function buildTerritoryGroups(
       position: positions[index],
       color,
       colorKey,
-      radius: Math.max(1, system.zoneRadius) * displayScale,
-      strength: Math.max(0.01, system.zoneStrength ?? 1),
+      radius: Math.max(1, influenceRadius) * displayScale,
+      strength: Math.max(0.01, influenceStrength),
       name: system.zoneName ?? system.faction,
     }
     const group = groups.get(colorKey)

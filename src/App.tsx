@@ -13,6 +13,8 @@ import { SolarSystemScene } from './scenes/SolarSystemScene'
 import { buildPlanetSeedKey } from './procedural/planetSeed'
 import { getSystemPrimaryColor, getSystemPrimaryLabel, isBlackHoleSystem, isGalacticCoreSystem } from './components/SystemPrimary'
 import { ownershipBadgeLabel, ownershipKey, ownershipTone, planetOwnershipLabel, playerRelationLabel, relationshipDescription, resolveOwnership, resolvePlanetOwnership, systemOwnershipLabel, territoryOwnershipLabel } from './domain/ownership'
+import { MOON_UNITS_TO_INSPECTION_WORLD, PLANET_RADIUS_TO_INSPECTION_WORLD, SYSTEM_UNITS_TO_WORLD } from './spatial/renderScales'
+import { resolveSystemInfluence } from './domain/systemInfluence'
 
 const productionPresentation = [
   { key: 'industry', label: 'Industry', icon: 'IND' },
@@ -25,6 +27,13 @@ const productionPresentation = [
 
 function formatProduction(value: number) {
   return new Intl.NumberFormat('en', { notation: 'compact', maximumFractionDigits: 1 }).format(value)
+}
+
+function formatSolarMass(value: number) {
+  return new Intl.NumberFormat('en', {
+    notation: value >= 10_000 ? 'compact' : 'standard',
+    maximumFractionDigits: value < 10 ? 2 : 1,
+  }).format(value)
 }
 
 function formatTemperature(value: number) {
@@ -85,6 +94,7 @@ export default function App({ currentPlayer }: { currentPlayer: PlayerIdentity }
   const planetOwnership = planet && system ? resolvePlanetOwnership(planet, system, currentPlayer) : undefined
   const systemOwnershipTone = ownershipTone(systemOwnership)
   const planetOwnershipTone = ownershipTone(planetOwnership)
+  const systemInfluence = system ? resolveSystemInfluence(system) : undefined
   const panelRelationshipClass = view.type === 'system' && system && !systemIsCore
       ? `relationship-panel relationship-panel--${systemOwnershipTone}`
       : view.type === 'planet' && planet
@@ -117,14 +127,21 @@ export default function App({ currentPlayer }: { currentPlayer: PlayerIdentity }
     }>()
 
     galaxySystems.forEach((item) => {
-      if (!item.zoneColor || !item.zoneRadius) return
+      if (!item.zoneColor) return
+      const baseInfluence = resolveSystemInfluence(item)
+      const influenceRadius = typeof item.zoneRadius === 'number' && Number.isFinite(item.zoneRadius) && item.zoneRadius > 0
+        ? item.zoneRadius
+        : baseInfluence.influenceRadius
+      const influenceStrength = typeof item.zoneStrength === 'number' && Number.isFinite(item.zoneStrength) && item.zoneStrength > 0
+        ? item.zoneStrength
+        : baseInfluence.influenceStrength
       const ownership = resolveOwnership(item.owner, currentPlayer)
       const key = `${item.zoneColor.toLowerCase()}:${ownershipKey(item.owner)}`
       const current = groups.get(key)
       if (current) {
         current.systems += 1
-        current.strength += item.zoneStrength ?? 1
-        current.reach = Math.max(current.reach, item.zoneRadius)
+        current.strength += influenceStrength
+        current.reach = Math.max(current.reach, influenceRadius)
       } else {
         groups.set(key, {
           color: item.zoneColor,
@@ -132,8 +149,8 @@ export default function App({ currentPlayer }: { currentPlayer: PlayerIdentity }
               ? item.zoneName ?? item.faction
               : territoryOwnershipLabel(ownership),
           systems: 1,
-          strength: item.zoneStrength ?? 1,
-          reach: item.zoneRadius,
+          strength: influenceStrength,
+          reach: influenceRadius,
         })
       }
     })
@@ -143,15 +160,48 @@ export default function App({ currentPlayer }: { currentPlayer: PlayerIdentity }
       ...territory,
     }))  }, [currentPlayer, galaxySystems])
 
+  const systemOrbitWorldExtent = useMemo(() => {
+    if (!system || system.planets.length === 0) return 0
+
+    const outerOrbit = Math.max(
+      ...system.planets.map((candidate) =>
+        candidate.orbitRadius * (1 + (candidate.orbitEccentricity ?? 0)),
+      ),
+      8,
+    )
+
+    return outerOrbit * SYSTEM_UNITS_TO_WORLD
+  }, [system])
+
   const systemCameraDistance = useMemo(() => {
     if (!system) return 42
     if (isGalacticCoreSystem(system)) {
       const diskRadius = system.blackHole?.accretionDisk?.outerRadius ?? 18
-      return MathUtils.clamp(diskRadius * 18, 320, 900)
+      return MathUtils.clamp(diskRadius * 18, 320, 5200)
     }
-    const outerOrbit = Math.max(...system.planets.map((candidate) => candidate.orbitRadius), 8)
-    return MathUtils.clamp(outerOrbit * 2.35 * 3.2, 140, 720)
-  }, [system])
+    return MathUtils.clamp(systemOrbitWorldExtent * 3.2, 160, 5200)
+  }, [system, systemOrbitWorldExtent])
+
+  const systemCameraMaxDistance = MathUtils.clamp(systemCameraDistance * 4, 8000, 24000)
+  const systemCameraFarDistance = Math.max(
+    systemCameraMaxDistance * 2,
+    systemCameraMaxDistance + systemOrbitWorldExtent * 1.25 + 1000,
+  )
+
+  const planetCameraMaxDistance = useMemo(() => {
+    if (!planet) return 80
+
+    const parentRadius = planet.radius * PLANET_RADIUS_TO_INSPECTION_WORLD
+    const outerMoonExtent = (planet.moons ?? []).reduce((maximum, moon) => {
+      const apoapsis = moon.orbitRadius
+        * (1 + (moon.orbitEccentricity ?? 0))
+        * MOON_UNITS_TO_INSPECTION_WORLD
+      const bodyRadius = Math.max(0.07, moon.radius * 2.15)
+      return Math.max(maximum, apoapsis + bodyRadius)
+    }, parentRadius)
+
+    return MathUtils.clamp(outerMoonExtent * 5, 80, 1600)
+  }, [planet])
 
   const camera =
       view.type === 'universe'
@@ -159,8 +209,8 @@ export default function App({ currentPlayer }: { currentPlayer: PlayerIdentity }
           : view.type === 'galaxy'
               ? { position: [0, 3440, 5520] as [number, number, number], fov: 46, near: 0.1, far: 24000 }
               : view.type === 'system'
-                  ? { position: [0, systemCameraDistance * 0.56, systemCameraDistance] as [number, number, number], fov: 46, near: 0.1, far: 12000 }
-                  : { position: [0, 1.2, 9] as [number, number, number], fov: 42, near: 0.1, far: 2400 }
+                  ? { position: [0, systemCameraDistance * 0.56, systemCameraDistance] as [number, number, number], fov: 46, near: 0.1, far: systemCameraFarDistance }
+                  : { position: [0, 1.2, 9] as [number, number, number], fov: 42, near: 0.1, far: Math.max(planetCameraMaxDistance * 2, 3000) }
 
   function transitionTo(nextView: ViewState, label: string) {
     if (transitionTimer.current !== undefined) window.clearTimeout(transitionTimer.current)
@@ -314,7 +364,7 @@ export default function App({ currentPlayer }: { currentPlayer: PlayerIdentity }
                   makeDefault
                   enablePan={view.type !== 'planet'}
                   minDistance={view.type === 'planet' ? 0.7 : 0.85}
-                  maxDistance={view.type === 'system' ? 4000 : 15}
+                  maxDistance={view.type === 'system' ? systemCameraMaxDistance : planetCameraMaxDistance}
                   minPolarAngle={0.22}
                   maxPolarAngle={Math.PI - 0.22}
                   dampingFactor={0.055}
@@ -657,9 +707,11 @@ export default function App({ currentPlayer }: { currentPlayer: PlayerIdentity }
                       <div><dt>Authority</dt><dd>{systemIsCore ? 'Core registry' : systemColonized ? system.faction : 'None'}</dd></div>
                       <div><dt>Worlds</dt><dd>{system.planets.length}</dd></div>
                       <div><dt>Primary</dt><dd>{isBlackHoleSystem(system) ? 'Black hole' : 'Star'}</dd></div>
+                      <div><dt>Primary mass</dt><dd>{formatSolarMass(systemInfluence?.primaryMassSolar ?? 1)} M☉</dd></div>
+                      <div><dt>Influence range</dt><dd>{(systemInfluence?.influenceRadius ?? 38).toFixed(1)} map units</dd></div>
+                      <div><dt>Influence strength</dt><dd>{(systemInfluence?.influenceStrength ?? 0.54).toFixed(2)}</dd></div>
                       {isBlackHoleSystem(system) && system.blackHole && (
                           <>
-                            <div><dt>Mass</dt><dd>{new Intl.NumberFormat('en', { notation: 'compact', maximumFractionDigits: 1 }).format(system.blackHole.massSolar)} M☉</dd></div>
                             <div><dt>Spin</dt><dd>{system.blackHole.spin.toFixed(2)}</dd></div>
                             <div><dt>Accretion</dt><dd>{system.blackHole.accretionDisk ? 'Active disc' : 'Quiescent'}</dd></div>
                           </>

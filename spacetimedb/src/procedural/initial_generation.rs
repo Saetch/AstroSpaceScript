@@ -126,6 +126,9 @@ pub(crate) fn generate_star_systems(
                 .max(generated_primary.radius)
                 * 1.15;
 
+            let (influence_radius, influence_strength) =
+                system_influence_from_primary(&generated_primary);
+
             let system_description = if generated_primary.is_black_hole {
                 "An unclaimed system centered on a stellar-mass black hole.".to_string()
             } else {
@@ -153,6 +156,9 @@ pub(crate) fn generate_star_systems(
                 spectral_type: generated_primary.spectral_type.to_string(),
                 star_color: generated_primary.color.to_string(),
                 star_radius: generated_primary.radius,
+                primary_mass_solar: generated_primary.mass as f32,
+                influence_radius,
+                influence_strength,
                 black_hole,
                 zone_color: None,
                 zone_radius: None,
@@ -185,7 +191,7 @@ pub(crate) fn generate_star_systems(
             const DISTR_16_PLANETS_CUTOFF: u32 = 9_991;
 
             let distr_value = rng.gen_range(0..DISTR_MAX_VALUE);
-            let number_of_planets = match distr_value {
+            let generated_planet_count: usize = match distr_value {
                 0..DISTR_0_PLANETS_CUTOFF => 0,
                 DISTR_0_PLANETS_CUTOFF..DISTR_1_PLANET_CUTOFF => 1,
                 DISTR_1_PLANET_CUTOFF..DISTR_2_PLANETS_CUTOFF => 2,
@@ -205,13 +211,14 @@ pub(crate) fn generate_star_systems(
                 DISTR_15_PLANETS_CUTOFF..DISTR_16_PLANETS_CUTOFF => 16,
                 _ => 17,
             };
+            let number_of_planets = generated_planet_count.min(8);
 
             let mut orbit_seed = initial_planet_orbit_radius(
                 &mut rng,
                 generated_primary.heating_mass,
                 generated_primary.is_black_hole,
             );
-            let mut previous_orbit_radius: Option<f32> = None;
+            let mut previous_apoapsis: Option<f32> = None;
             let mut previous_visual_extent = 0.0f32;
 
             for planet_index in 0..number_of_planets {
@@ -223,6 +230,31 @@ pub(crate) fn generate_star_systems(
                         generated_primary.is_black_hole,
                     );
                 }
+
+                let orbit_eccentricity = generate_planet_orbit_eccentricity(
+                    &mut rng,
+                    planet_index,
+                    number_of_planets,
+                );
+                let orbit_inclination = generate_planet_orbit_inclination(
+                    &mut rng,
+                    planet_index,
+                    number_of_planets,
+                );
+                // Stratify the line of nodes by body index so a generated
+                // system cannot accidentally place every orbit at nearly the
+                // same visible angle. Small random jitter keeps systems organic.
+                let golden_angle = 2.399_963_1f32;
+                let orbit_longitude = (
+                    planet_index as f32 * golden_angle
+                        + rng.gen_range(-0.16f32..0.16f32)
+                )
+                    .rem_euclid(std::f32::consts::TAU);
+                let orbit_argument = (
+                    planet_index as f32 * 1.173_984_5f32
+                        + rng.gen_range(0.0f32..std::f32::consts::TAU)
+                )
+                    .rem_euclid(std::f32::consts::TAU);
 
                 let mut orbit_radius = orbit_seed;
                 let mut thermal_zone = estimate_thermal_zone(
@@ -240,18 +272,20 @@ pub(crate) fn generate_star_systems(
                 // become hot/cold/frozen according to its final orbit.
                 for _ in 0..3 {
                     let visual_extent = planet_visual_extent(&appearance);
-                    let minimum_orbit = minimum_clear_orbit_radius(
+                    let minimum_periapsis = minimum_clear_orbit_radius(
                         primary_visual_extent,
-                        previous_orbit_radius,
+                        previous_apoapsis,
                         previous_visual_extent,
                         visual_extent,
                     );
+                    let minimum_semi_major =
+                        minimum_periapsis / (1.0 - orbit_eccentricity);
 
-                    if orbit_radius >= minimum_orbit {
+                    if orbit_radius >= minimum_semi_major {
                         break;
                     }
 
-                    orbit_radius = minimum_orbit;
+                    orbit_radius = minimum_semi_major;
                     thermal_zone = estimate_thermal_zone(
                         generated_primary.heating_mass,
                         orbit_radius,
@@ -266,12 +300,14 @@ pub(crate) fn generate_star_systems(
                 // The final generated appearance may be larger than the prior
                 // provisional one, especially when rings are present.
                 let mut visual_extent = planet_visual_extent(&appearance);
-                orbit_radius = orbit_radius.max(minimum_clear_orbit_radius(
-                    primary_visual_extent,
-                    previous_orbit_radius,
-                    previous_visual_extent,
-                    visual_extent,
-                ));
+                orbit_radius = orbit_radius.max(
+                    minimum_clear_orbit_radius(
+                        primary_visual_extent,
+                        previous_apoapsis,
+                        previous_visual_extent,
+                        visual_extent,
+                    ) / (1.0 - orbit_eccentricity),
+                );
 
                 // Recompute from the final display orbit so close worlds are
                 // scorched/hot and distant worlds become cold or frozen.
@@ -286,23 +322,27 @@ pub(crate) fn generate_star_systems(
                     appearance =
                         generate_planet_appearance(&mut rng, planet_kind);
                     visual_extent = planet_visual_extent(&appearance);
-                    orbit_radius = orbit_radius.max(minimum_clear_orbit_radius(
-                        primary_visual_extent,
-                        previous_orbit_radius,
-                        previous_visual_extent,
-                        visual_extent,
-                    ));
+                    orbit_radius = orbit_radius.max(
+                        minimum_clear_orbit_radius(
+                            primary_visual_extent,
+                            previous_apoapsis,
+                            previous_visual_extent,
+                            visual_extent,
+                        ) / (1.0 - orbit_eccentricity),
+                    );
                 }
 
                 orbit_seed = orbit_radius;
-                previous_orbit_radius = Some(orbit_radius);
+                previous_apoapsis =
+                    Some(orbit_radius * (1.0 + orbit_eccentricity));
                 previous_visual_extent = visual_extent;
 
                 let primary_mass = generated_primary.mass as f32;
                 let orbit_speed = (
                     2.4 * primary_mass.sqrt() / orbit_radius.powf(1.5)
                 )
-                    .clamp(0.002, 0.30);
+                    .clamp(0.002, 0.30)
+                    * 0.28;
                 let orbit_offset =
                     rng.gen_range(0.0f32..std::f32::consts::TAU);
 
@@ -359,6 +399,10 @@ pub(crate) fn generate_star_systems(
                     orbit_radius,
                     orbit_speed,
                     orbit_offset,
+                    orbit_inclination,
+                    orbit_eccentricity,
+                    orbit_longitude,
+                    orbit_argument,
                     orbit_index: planet_index as u16,
                     color: appearance.color.to_string(),
                     secondary_color: appearance
@@ -405,9 +449,16 @@ pub(crate) fn generate_star_systems(
                     let moon_orbit_radius = next_moon_orbit;
 
                     let moon_orbit_speed =
-                        (0.90 / moon_orbit_radius.sqrt()).clamp(0.06, 0.90);
+                        (0.90 / moon_orbit_radius.sqrt()).clamp(0.06, 0.90) * 0.18;
 
                     let moon_orbit_offset =
+                        rng.gen_range(0.0f32..std::f32::consts::TAU);
+                    let moon_orbit_inclination =
+                        generate_moon_orbit_inclination(&mut rng, moon_index);
+                    let moon_orbit_eccentricity = rng.gen_range(0.0f32..0.12f32);
+                    let moon_orbit_longitude =
+                        rng.gen_range(0.0f32..std::f32::consts::TAU);
+                    let moon_orbit_argument =
                         rng.gen_range(0.0f32..std::f32::consts::TAU);
 
                     moons.push(Moon {
@@ -419,6 +470,10 @@ pub(crate) fn generate_star_systems(
                         orbit_radius: moon_orbit_radius,
                         orbit_speed: moon_orbit_speed,
                         orbit_offset: moon_orbit_offset,
+                        orbit_inclination: moon_orbit_inclination,
+                        orbit_eccentricity: moon_orbit_eccentricity,
+                        orbit_longitude: moon_orbit_longitude,
+                        orbit_argument: moon_orbit_argument,
                         color: moon_appearance.color.to_string(),
                         secondary_color: moon_appearance
                             .secondary_color
@@ -442,6 +497,16 @@ struct GeneratedPrimary {
     spectral_type: &'static str,
     color: &'static str,
     radius: f32,
+}
+
+fn system_influence_from_primary(primary: &GeneratedPrimary) -> (f32, f32) {
+    // Game-map values rather than a physical Hill sphere. Cube-root radius
+    // scaling keeps the common 0.1-2 M_sun systems distinct while clamping
+    // rare massive stars and stellar black holes to a useful map range.
+    let mass = primary.mass.max(0.08);
+    let radius = (22.0 + 16.0 * mass.cbrt()).clamp(28.0, 96.0) as f32;
+    let strength = (0.24 + 0.30 * mass.powf(0.28)).clamp(0.28, 1.60) as f32;
+    (radius, strength)
 }
 
 fn generate_primary<R: Rng>(rng: &mut R) -> GeneratedPrimary {
@@ -557,6 +622,85 @@ fn generate_star<R: Rng>(rng: &mut R) -> GeneratedPrimary {
         color,
         radius,
     }
+}
+
+fn is_outer_planet(planet_index: usize, planet_count: usize) -> bool {
+    if planet_count == 0 {
+        return false;
+    }
+
+    let outer_start = if planet_count <= 3 {
+        planet_count.saturating_sub(1)
+    } else {
+        (planet_count * 2) / 3
+    };
+
+    planet_index >= outer_start
+}
+
+fn generate_planet_orbit_inclination<R: Rng>(
+    rng: &mut R,
+    planet_index: usize,
+    planet_count: usize,
+) -> f32 {
+    let outer = is_outer_planet(planet_index, planet_count);
+
+    // Keep the ordinary planets under ten degrees, but distribute them across
+    // that range instead of allowing a random draw to cluster around one flat
+    // plane. Only outer planets can receive the rare 10-23 degree excursion.
+    let magnitude = if outer && rng.gen_bool(0.08) {
+        rng.gen_range(10.0f32..=23.0f32)
+    } else {
+        let minimum = if outer { 3.2f32 } else { 2.4f32 };
+        let maximum = if outer { 9.8f32 } else { 8.8f32 };
+        let stratified = (
+            planet_index as f32 * 0.618_034f32
+                + rng.gen_range(0.08f32..0.32f32)
+        )
+            .fract();
+        minimum + stratified * (maximum - minimum)
+    };
+
+    // Alternating signs guarantees neighboring bodies do not all tilt to the
+    // same side of the system ecliptic. The longitude above then rotates each
+    // tilt around a different ascending node.
+    let signed_degrees = if planet_index % 2 == 0 { magnitude } else { -magnitude };
+    signed_degrees.to_radians()
+}
+
+fn generate_planet_orbit_eccentricity<R: Rng>(
+    rng: &mut R,
+    planet_index: usize,
+    planet_count: usize,
+) -> f32 {
+    let (minimum, maximum) = if is_outer_planet(planet_index, planet_count) {
+        (0.34f32, 0.62f32)
+    } else {
+        (0.36f32, 0.58f32)
+    };
+    let stratified = (
+        planet_index as f32 * 0.381_966f32
+            + rng.gen_range(0.04f32..0.28f32)
+    )
+        .fract();
+
+    // These are still moderate orbital eccentricities, but unlike values below
+    // ~0.2 they produce a clearly readable ellipse at system-map scale.
+    minimum + stratified * (maximum - minimum)
+}
+
+fn generate_moon_orbit_inclination<R: Rng>(rng: &mut R, moon_index: usize) -> f32 {
+    let ordinary_maximum = (6.0 + moon_index as f32 * 0.75).min(10.0);
+    let low_bias = rng.gen_range(0.0f32..1.0f32);
+
+    let magnitude = if moon_index > 0 && rng.gen_bool(0.08) {
+        rng.gen_range(8.0f32..14.0f32)
+    } else {
+        0.4 + low_bias * low_bias * (ordinary_maximum - 0.4)
+    };
+
+    let signed_degrees = if rng.gen_bool(0.5) { -magnitude } else { magnitude };
+    signed_degrees.to_radians()
 }
 
 #[derive(Clone, Copy)]

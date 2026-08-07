@@ -1158,3 +1158,51 @@ button.galaxy-overview-label:focus-visible {
 .relationship-panel:not(.relationship-panel--self)::-webkit-scrollbar-thumb {
   background: rgba(var(--relation-rgb), 0.42);
 }
+
+.planet-locator {
+  display: grid;
+  justify-items: center;
+  gap: 2px;
+  min-width: max-content;
+  padding: 5px 8px 1px;
+  border: 0;
+  background: transparent;
+  color: #9eefff;
+  cursor: pointer;
+  transform: translateY(-30px);
+  filter: drop-shadow(0 0 5px rgba(111, 230, 255, 0.95)) drop-shadow(0 0 13px rgba(53, 156, 255, 0.72));
+  transition: transform 140ms ease, color 140ms ease, filter 140ms ease;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+  touch-action: manipulation;
+}
+.planet-locator * {
+  -webkit-user-select: none;
+  user-select: none;
+}
+.planet-locator:hover,
+.planet-locator:focus-visible {
+  color: #ffffff;
+  transform: translateY(-33px) scale(1.08);
+  filter: drop-shadow(0 0 7px rgba(203, 250, 255, 1)) drop-shadow(0 0 18px rgba(73, 183, 255, 0.92));
+}
+.planet-locator--active {
+  color: #ffffff;
+  filter: drop-shadow(0 0 8px rgba(220, 253, 255, 1)) drop-shadow(0 0 22px rgba(94, 215, 255, 1));
+}
+.planet-locator__name {
+  padding: 3px 6px;
+  border: 1px solid rgba(157, 235, 255, 0.38);
+  border-radius: 999px;
+  background: rgba(3, 9, 24, 0.78);
+  color: currentColor;
+  font: 600 9px Space Grotesk, sans-serif;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  backdrop-filter: blur(8px);
+}
+.planet-locator__arrow {
+  font-size: 19px;
+  line-height: 0.8;
+}
