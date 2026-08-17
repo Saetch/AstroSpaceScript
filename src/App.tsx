@@ -182,10 +182,14 @@ export default function App({ currentPlayer }: { currentPlayer: PlayerIdentity }
     return MathUtils.clamp(systemOrbitWorldExtent * 3.2, 160, 5200)
   }, [system, systemOrbitWorldExtent])
 
-  const systemCameraMaxDistance = MathUtils.clamp(systemCameraDistance * 4, 8000, 24000)
+  const systemCameraMaxDistance = MathUtils.clamp(
+    Math.max(systemCameraDistance * 12, systemOrbitWorldExtent * 40),
+    28000,
+    180000,
+  )
   const systemCameraFarDistance = Math.max(
-    systemCameraMaxDistance * 2,
-    systemCameraMaxDistance + systemOrbitWorldExtent * 1.25 + 1000,
+    systemCameraMaxDistance * 1.35,
+    systemCameraMaxDistance + systemOrbitWorldExtent * 2.5 + 4000,
   )
 
   const planetCameraMaxDistance = useMemo(() => {

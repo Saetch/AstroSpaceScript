@@ -69,8 +69,9 @@ function OrbitingPlanet({
   const selectionHalo = useRef<THREE.Mesh>(null)
   const locatorAnchor = useRef<THREE.Group>(null)
   const worldPosition = useRef(new THREE.Vector3())
-  const locatorDirection = useRef(new THREE.Vector3())
-  const cameraForward = useRef(new THREE.Vector3())
+  const cameraSpacePosition = useRef(new THREE.Vector3())
+  const projectedPosition = useRef(new THREE.Vector3())
+  const locatorRay = useRef(new THREE.Vector3())
   const tidallyLocked = planet.tidallyLocked ?? planet.type.toLowerCase().includes('tidally locked')
   const [hovered, setHovered] = useState(false)
   const [locatorVisible, setLocatorVisible] = useState(false)
@@ -104,33 +105,8 @@ function OrbitingPlanet({
     }
 
     if (positionGroup.current) {
-      const cameraDistance = state.camera.position.distanceTo(
-        positionGroup.current.getWorldPosition(worldPosition.current),
-      )
-      const directionToPlanet = locatorDirection.current
-        .copy(worldPosition.current)
-        .sub(state.camera.position)
-      const locatorIsInFront = directionToPlanet.dot(
-        state.camera.getWorldDirection(cameraForward.current),
-      ) > 0
-
-      if (locatorAnchor.current) {
-        locatorAnchor.current.visible = locatorIsInFront
-        if (locatorIsInFront) {
-          // Keep the HTML helper on the same camera ray as the planet, but at
-          // a fixed near-camera depth. Its screen position remains accurate
-          // while avoiding far-plane and DOM z-index limits at extreme zoom.
-          const locatorDepth = THREE.MathUtils.clamp(
-            state.camera.far * 0.002,
-            18,
-            48,
-          )
-          locatorAnchor.current.position
-            .copy(state.camera.position)
-            .addScaledVector(directionToPlanet.normalize(), locatorDepth)
-        }
-      }
-
+      positionGroup.current.getWorldPosition(worldPosition.current)
+      const cameraDistance = state.camera.position.distanceTo(worldPosition.current)
       const perspectiveCamera = state.camera as THREE.PerspectiveCamera
       const pixelsPerWorldUnit = perspectiveCamera.isPerspectiveCamera
         ? state.size.height / (
@@ -139,7 +115,24 @@ function OrbitingPlanet({
           )
         : 1
       const apparentRadius = planet.radius * pixelsPerWorldUnit
-      const shouldShowLocator = apparentRadius < 5.5 && cameraDistance > 90
+
+      cameraSpacePosition.current.copy(worldPosition.current).applyMatrix4(state.camera.matrixWorldInverse)
+      projectedPosition.current.copy(worldPosition.current).project(state.camera)
+      const inFrontOfCamera = cameraSpacePosition.current.z < -Math.max(state.camera.near, 0.001)
+      const inViewport = inFrontOfCamera
+        && Math.abs(projectedPosition.current.x) <= 1
+        && Math.abs(projectedPosition.current.y) <= 1
+      const shouldShowLocator = apparentRadius < 5.5 && cameraDistance > 90 && inViewport
+
+      if (locatorAnchor.current && inFrontOfCamera) {
+        const locatorDepth = perspectiveCamera.isPerspectiveCamera
+          ? Math.max(12, perspectiveCamera.near * 80)
+          : 12
+        locatorRay.current.copy(worldPosition.current).sub(state.camera.position).normalize()
+        locatorAnchor.current.position
+          .copy(state.camera.position)
+          .addScaledVector(locatorRay.current, locatorDepth)
+      }
 
       if (locatorVisibleRef.current !== shouldShowLocator) {
         locatorVisibleRef.current = shouldShowLocator
@@ -260,29 +253,23 @@ function OrbitingPlanet({
         onFocusMoon={onFocusMoon}
       />
 
-      <Html center distanceFactor={10} position={[0, planet.radius + 0.7, 0]} style={{ pointerEvents: 'none' }}>
-        <div className={`world-label ${hovered ? 'world-label--active' : ''}`}>
-          <strong>{planet.name}</strong>
-          <span>{planet.type}</span>
-        </div>
-      </Html>
+        <Html center distanceFactor={10} position={[0, planet.radius + 0.7, 0]} style={{ pointerEvents: 'none' }}>
+          <div className={`world-label ${hovered ? 'world-label--active' : ''}`}>
+            <strong>{planet.name}</strong>
+            <span>{planet.type}</span>
+          </div>
+        </Html>
       </group>
 
-      <group ref={locatorAnchor} frustumCulled={false}>
+      <group ref={locatorAnchor}>
         {locatorVisible && (
-          <Html
-            center
-            zIndexRange={[80, 0]}
-            style={{ pointerEvents: 'auto', userSelect: 'none' }}
-          >
+          <Html center zIndexRange={[80, 0]} style={{ pointerEvents: 'auto', userSelect: 'none' }}>
             <button
               type="button"
-              draggable={false}
               className={`planet-locator ${highlighted ? 'planet-locator--active' : ''}`}
               title={`Highlight ${planet.name}`}
               aria-label={`Highlight ${planet.name} and its orbit`}
               onPointerDown={(event) => event.stopPropagation()}
-              onDragStart={(event) => event.preventDefault()}
               onClick={(event) => {
                 event.stopPropagation()
                 onHighlight()
