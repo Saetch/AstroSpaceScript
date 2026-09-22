@@ -1206,3 +1206,194 @@ button.galaxy-overview-label:focus-visible {
   font-size: 19px;
   line-height: 0.8;
 }
+
+.spacecraft-launcher {
+  margin-top: 16px;
+  border: 1px solid rgba(112, 224, 255, 0.22);
+  border-radius: 14px;
+  background: linear-gradient(145deg, rgba(16, 54, 76, 0.28), rgba(7, 12, 27, 0.74));
+  padding: 14px;
+}
+.spacecraft-launcher > span {
+  color: #7ce7ff;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+}
+.spacecraft-launcher strong { display: block; margin-top: 7px; font: 600 13px Space Grotesk, sans-serif; }
+.spacecraft-launcher p { margin: 7px 0 12px; color: #8f9bb8; font-size: 11px; line-height: 1.5; }
+.spacecraft-launcher button {
+  width: 100%;
+  border: 1px solid rgba(120, 220, 255, 0.34);
+  border-radius: 10px;
+  background: rgba(38, 136, 171, 0.16);
+  color: #dff8ff;
+  padding: 9px 11px;
+  cursor: pointer;
+}
+.spacecraft-launcher button:hover { border-color: rgba(154, 237, 255, 0.7); background: rgba(47, 159, 198, 0.24); }
+
+.maneuver-planner {
+  position: absolute;
+  z-index: 11;
+  left: 24px;
+  bottom: 74px;
+  width: min(360px, calc(100vw - 48px));
+  border-radius: 18px;
+  padding: 16px;
+  user-select: none;
+}
+.maneuver-planner__heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.maneuver-planner__heading span { min-width: 0; }
+.maneuver-planner__heading small,
+.maneuver-planner__heading strong { display: block; }
+.maneuver-planner__heading small { color: #78e2ff; font-size: 9px; font-weight: 700; letter-spacing: 0.16em; }
+.maneuver-planner__heading strong { margin-top: 4px; font: 600 14px Space Grotesk, sans-serif; }
+.maneuver-planner__heading > button {
+  width: 28px;
+  height: 28px;
+  border: 1px solid rgba(142, 161, 211, 0.2);
+  border-radius: 8px;
+  background: rgba(9, 14, 31, 0.65);
+  color: #9aa6c0;
+  cursor: pointer;
+}
+.maneuver-planner__heading > button:hover { color: white; border-color: rgba(125, 224, 255, 0.5); }
+.maneuver-planner__status {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 13px 0 14px;
+  padding: 8px 10px;
+  border: 1px solid rgba(102, 220, 255, 0.16);
+  border-radius: 10px;
+  background: rgba(53, 151, 186, 0.08);
+}
+.maneuver-planner__status span { color: #8feaff; font-size: 9px; font-weight: 700; letter-spacing: 0.12em; }
+.maneuver-planner__status small { color: #7d89a6; font-size: 9px; }
+.maneuver-field { display: block; margin-top: 13px; }
+.maneuver-field > span { display: flex; justify-content: space-between; gap: 12px; color: #929fbc; font-size: 10px; }
+.maneuver-field > span b { color: #eff7ff; font-weight: 600; }
+.maneuver-field > input[type='range'] { width: 100%; margin: 10px 0 4px; accent-color: #7ce7ff; }
+.maneuver-precision-row { display: grid; grid-template-columns: auto auto 1fr auto auto; gap: 5px; margin-top: 5px; }
+.maneuver-precision-row button,
+.maneuver-precision-row input {
+  min-width: 0;
+  border: 1px solid rgba(136, 157, 211, 0.18);
+  border-radius: 8px;
+  background: rgba(9, 14, 31, 0.72);
+  color: #dfe8fb;
+  padding: 7px 6px;
+  text-align: center;
+}
+.maneuver-precision-row button { cursor: pointer; font-size: 10px; }
+.maneuver-precision-row button:hover { border-color: rgba(124, 231, 255, 0.48); }
+.maneuver-precision-row input { width: 100%; font-size: 11px; }
+.maneuver-axis-preview { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; margin-top: 12px; }
+.maneuver-axis-preview span {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px dashed rgba(132, 151, 200, 0.18);
+  border-radius: 9px;
+  color: #687590;
+  padding: 8px;
+  font-size: 9px;
+}
+.maneuver-axis-preview i { display: grid; place-items: center; width: 18px; height: 18px; border-radius: 50%; background: rgba(117, 139, 190, 0.1); font-style: normal; }
+.maneuver-axis-preview b { margin-left: auto; font-weight: 500; }
+.maneuver-telemetry { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; margin: 13px 0 0; }
+.maneuver-telemetry div { border-radius: 9px; background: rgba(8, 13, 29, 0.62); border: 1px solid rgba(135, 155, 205, 0.1); padding: 8px; }
+.maneuver-telemetry dt { color: #6f7c99; font-size: 8px; text-transform: uppercase; letter-spacing: 0.1em; }
+.maneuver-telemetry dd { margin: 4px 0 0; font-size: 11px; color: #eaf2ff; }
+.maneuver-warning { margin: 10px 0 0; color: #ff9cac; font-size: 10px; line-height: 1.45; }
+.maneuver-planner__actions { display: grid; grid-template-columns: 1fr 1.4fr; gap: 8px; margin-top: 13px; }
+.maneuver-planner__actions button { border-radius: 10px; padding: 9px 10px; cursor: pointer; }
+.maneuver-planner__actions button:disabled { opacity: 0.38; cursor: default; }
+.maneuver-secondary { border: 1px solid rgba(140, 158, 205, 0.2); background: rgba(8, 13, 29, 0.7); color: #b7c1da; }
+.maneuver-primary { border: 1px solid rgba(124, 230, 255, 0.45); background: rgba(41, 150, 188, 0.22); color: #e6fbff; }
+.maneuver-planner__note { margin: 10px 0 0; color: #687590; font-size: 9px; line-height: 1.45; }
+
+.maneuver-node-label,
+.spacecraft-label {
+  min-width: max-content;
+  border: 1px solid rgba(255, 218, 137, 0.42);
+  border-radius: 8px;
+  background: rgba(9, 11, 22, 0.84);
+  padding: 5px 7px;
+  box-shadow: 0 0 18px rgba(255, 210, 105, 0.16);
+}
+.maneuver-node-label strong,
+.maneuver-node-label span,
+.spacecraft-label strong,
+.spacecraft-label span { display: block; }
+.maneuver-node-label strong,
+.spacecraft-label strong { font: 600 9px Space Grotesk, sans-serif; }
+.maneuver-node-label span,
+.spacecraft-label span { margin-top: 2px; color: #8d9abb; font-size: 7px; letter-spacing: 0.08em; }
+.maneuver-node-label--invalid { border-color: rgba(255, 105, 133, 0.55); box-shadow: 0 0 18px rgba(255, 90, 120, 0.18); }
+.spacecraft-label { border-color: rgba(120, 229, 255, 0.38); box-shadow: 0 0 18px rgba(79, 207, 255, 0.14); }
+.spacecraft-label span { color: #73dff8; }
+
+@media (max-width: 760px) {
+  .maneuver-planner {
+    left: 14px;
+    right: 14px;
+    bottom: 72px;
+    width: auto;
+    max-height: 48vh;
+    overflow: auto;
+  }
+  .maneuver-planner__note { display: none; }
+}
+
+/* Maneuver-node six-axis controls */
+.maneuver-axis-help {
+  margin: 10px 0 2px;
+  border: 1px solid rgba(126, 219, 255, 0.14);
+  border-radius: 9px;
+  background: rgba(58, 142, 176, 0.07);
+  color: #7d8aa8;
+  padding: 8px 9px;
+  font-size: 9px;
+  line-height: 1.45;
+}
+.maneuver-axis-endpoints {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 5px;
+  color: #687590;
+  font-size: 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+}
+.maneuver-field--prograde > input[type='range'] { accent-color: #6ee9ff; }
+.maneuver-field--radial > input[type='range'] { accent-color: #ffc96f; }
+.maneuver-field--normal > input[type='range'] { accent-color: #df8dff; }
+.maneuver-axis-label {
+  min-width: 28px;
+  border: 1px solid currentColor;
+  border-radius: 999px;
+  background: rgba(5, 9, 22, 0.88);
+  padding: 3px 5px;
+  color: #dff8ff;
+  font: 700 8px Space Grotesk, sans-serif;
+  letter-spacing: 0.07em;
+  text-align: center;
+  white-space: nowrap;
+  box-shadow: 0 0 14px rgba(97, 211, 255, 0.16);
+  -webkit-user-select: none;
+  user-select: none;
+}
+.maneuver-axis-label--prograde { color: #6ee9ff; }
+.maneuver-axis-label--radial { color: #ffc96f; }
+.maneuver-axis-label--normal { color: #df8dff; }
+.spacecraft-launcher--system button { display: none; }
+
+@media (min-width: 761px) {
+  .maneuver-planner {
+    max-height: calc(100vh - 110px);
+    overflow-y: auto;
+  }
+}

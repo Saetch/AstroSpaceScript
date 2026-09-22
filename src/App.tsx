@@ -10,11 +10,21 @@ import { GalaxyOverviewScene } from './scenes/GalaxyOverviewScene'
 import { GalaxyScene } from './scenes/GalaxyScene'
 import { PlanetScene } from './scenes/PlanetScene'
 import { SolarSystemScene } from './scenes/SolarSystemScene'
+import { SpacecraftManeuverPanel } from './components/SpacecraftManeuverPanel'
+import { SpacecraftManeuverScene } from './components/SpacecraftManeuverScene'
 import { buildPlanetSeedKey } from './procedural/planetSeed'
 import { getSystemPrimaryColor, getSystemPrimaryLabel, isBlackHoleSystem, isGalacticCoreSystem } from './components/SystemPrimary'
 import { ownershipBadgeLabel, ownershipKey, ownershipTone, planetOwnershipLabel, playerRelationLabel, relationshipDescription, resolveOwnership, resolvePlanetOwnership, systemOwnershipLabel, territoryOwnershipLabel } from './domain/ownership'
 import { MOON_UNITS_TO_INSPECTION_WORLD, PLANET_RADIUS_TO_INSPECTION_WORLD, SYSTEM_UNITS_TO_WORLD } from './spatial/renderScales'
 import { resolveSystemInfluence } from './domain/systemInfluence'
+import { getSimulationTimeSeconds } from './spatial/simulationClock'
+import {
+  commitManeuverPreview,
+  createSpacecraftPlanFromPlanet,
+  previewManeuver,
+  type ClientSpacecraftPlan,
+  type ManeuverAxis,
+} from './spatial/spacecraftManeuver'
 
 const productionPresentation = [
   { key: 'industry', label: 'Industry', icon: 'IND' },
@@ -63,6 +73,7 @@ export default function App({ currentPlayer }: { currentPlayer: PlayerIdentity }
   const [colonizationError, setColonizationError] = useState<string>()
   const [colonizationSequence, setColonizationSequence] = useState(0)
   const [transitionLabel, setTransitionLabel] = useState<string>()
+  const [spacecraftPlans, setSpacecraftPlans] = useState<Record<string, ClientSpacecraftPlan>>({})
   const transitionTimer = useRef<number | undefined>(undefined)
   const activeSystemId = view.type === 'system' || view.type === 'planet' ? view.systemId : undefined
 
@@ -100,6 +111,13 @@ export default function App({ currentPlayer }: { currentPlayer: PlayerIdentity }
       : view.type === 'planet' && planet
           ? `relationship-panel relationship-panel--${planetOwnershipTone}`
           : ''
+  const activeSpacecraftPlan = system ? spacecraftPlans[system.id] : undefined
+  const activeManeuverPreview = useMemo(
+    () => activeSpacecraftPlan && system
+      ? previewManeuver(activeSpacecraftPlan, system.primaryMassSolar ?? 1)
+      : undefined,
+    [activeSpacecraftPlan, system],
+  )
 
   useEffect(() => () => {
     if (transitionTimer.current !== undefined) window.clearTimeout(transitionTimer.current)
@@ -289,6 +307,55 @@ export default function App({ currentPlayer }: { currentPlayer: PlayerIdentity }
     }
   }
 
+  function launchLocalSpacecraftFromPlanet() {
+    if (!system || !planet) return
+    const plan = createSpacecraftPlanFromPlanet(system, planet, getSimulationTimeSeconds())
+    setSpacecraftPlans((current) => ({
+      ...current,
+      [system.id]: plan,
+    }))
+    // Maneuver planning is performed in the parent system frame. The ship starts at
+    // the selected planet's current orbital position, then becomes its own local node.
+    openSystem(system.id)
+  }
+
+  function setActiveDeltaV(axis: ManeuverAxis, value: number) {
+    updateActiveSpacecraft((plan) => ({
+      ...plan,
+      maneuver: {
+        ...plan.maneuver,
+        deltaV: { ...plan.maneuver.deltaV, [axis]: value },
+      },
+    }))
+  }
+
+  function updateActiveSpacecraft(mutator: (plan: ClientSpacecraftPlan) => ClientSpacecraftPlan) {
+    if (!system) return
+    setSpacecraftPlans((current) => {
+      const plan = current[system.id]
+      if (!plan) return current
+      return { ...current, [system.id]: mutator(plan) }
+    })
+  }
+
+  function removeLocalSpacecraft() {
+    if (!system) return
+    setSpacecraftPlans((current) => {
+      const next = { ...current }
+      delete next[system.id]
+      return next
+    })
+  }
+
+  function commitActiveManeuver() {
+    if (!activeSpacecraftPlan || !activeManeuverPreview) return
+    updateActiveSpacecraft((plan) => commitManeuverPreview(
+      plan,
+      activeManeuverPreview,
+      getSimulationTimeSeconds(),
+    ))
+  }
+
   return (
       <main className="app-shell">
         <Canvas
@@ -325,6 +392,14 @@ export default function App({ currentPlayer }: { currentPlayer: PlayerIdentity }
               />
           )}
           {view.type === 'system' && system && <SolarSystemScene system={system} onOpenPlanet={openPlanet} />}
+          {view.type === 'system' && activeSpacecraftPlan && activeManeuverPreview && (
+              <SpacecraftManeuverScene
+                  plan={activeSpacecraftPlan}
+                  preview={activeManeuverPreview}
+                  primaryMassSolar={system?.primaryMassSolar ?? 1}
+                  onDeltaVChange={setActiveDeltaV}
+              />
+          )}
           {view.type === 'planet' && planet && (
               <PlanetScene
                   system={system!}
@@ -379,6 +454,27 @@ export default function App({ currentPlayer }: { currentPlayer: PlayerIdentity }
             <GizmoViewport axisColors={['#e26d7c', '#67d89d', '#6f91ff']} labelColor="white" />
           </GizmoHelper>
         </Canvas>
+
+        {view.type === 'system' && activeSpacecraftPlan && activeManeuverPreview && (
+            <SpacecraftManeuverPanel
+                plan={activeSpacecraftPlan}
+                preview={activeManeuverPreview}
+                onBurnPhaseChange={(burnPhase) => updateActiveSpacecraft((plan) => ({
+                  ...plan,
+                  maneuver: { ...plan.maneuver, burnPhase },
+                }))}
+                onDeltaVChange={setActiveDeltaV}
+                onCommit={commitActiveManeuver}
+                onReset={() => updateActiveSpacecraft((plan) => ({
+                  ...plan,
+                  maneuver: {
+                    ...plan.maneuver,
+                    deltaV: { prograde: 0, radial: 0, normal: 0 },
+                  },
+                }))}
+                onRemove={removeLocalSpacecraft}
+            />
+        )}
 
         <div className={`scene-transition ${transitionLabel ? 'scene-transition--active' : ''}`} aria-hidden={!transitionLabel}>
           <svg className="scene-transition__ship" viewBox="0 0 140 72" aria-hidden="true">
@@ -745,6 +841,17 @@ export default function App({ currentPlayer }: { currentPlayer: PlayerIdentity }
                           <p>The accretion flow and core dynamics are rendered from backend parameters. No gameplay simulation is performed by the frontend.</p>
                         </div>
                     ) : null}
+                    {!systemIsCore && (
+                        <section className="spacecraft-launcher spacecraft-launcher--system">
+                          <span>LOCAL FLIGHT PROTOTYPE</span>
+                          <strong>{activeSpacecraftPlan ? activeSpacecraftPlan.name : 'Launch from a planet'}</strong>
+                          <p>
+                            {activeSpacecraftPlan
+                              ? `Origin: ${activeSpacecraftPlan.launchPlanetName ?? 'local system orbit'}. Drag the six maneuver arrows directly in the system view.`
+                              : 'Open a planet and use its launch control. The spacecraft will inherit that world’s current orbital position before you plan a maneuver.'}
+                          </p>
+                        </section>
+                    )}
                   </>
               )}
 
@@ -817,6 +924,15 @@ export default function App({ currentPlayer }: { currentPlayer: PlayerIdentity }
                           {colonizationError && <small>{colonizationError}</small>}
                         </section>
                     )}
+
+                    <section className="spacecraft-launcher spacecraft-launcher--planet">
+                      <span>LOCAL FLIGHT PROTOTYPE</span>
+                      <strong>Launch from {planet.name}</strong>
+                      <p>The test craft starts at this planet’s current position and orbital plane. Planning then continues in the star-system view with all six local Δv directions.</p>
+                      <button type="button" onClick={launchLocalSpacecraftFromPlanet}>
+                        {activeSpacecraftPlan?.launchPlanetId === planet.id ? 'Relaunch from this planet' : 'Launch local spacecraft'}
+                      </button>
+                    </section>
 
                     {planet.moons && planet.moons.length > 0 && (
                         <section className="moon-roster">
