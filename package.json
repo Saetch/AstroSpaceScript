@@ -17,6 +17,7 @@
     "better-auth": "^1.6.23",
     "react": "19.2.7",
     "react-dom": "19.2.7",
+    "rust-orbits": "file:../rust-orbits/pkg",
     "spacetimedb": "^2.6.1",
     "three": "0.185.1"
   },

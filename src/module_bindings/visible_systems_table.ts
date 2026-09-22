@@ -27,6 +27,9 @@ export default __t.row({
   spectralType: __t.string().name("spectral_type"),
   starColor: __t.string().name("star_color"),
   starRadius: __t.f32().name("star_radius"),
+  primaryMassSolar: __t.f32().name("primary_mass_solar"),
+  influenceRadius: __t.f32().name("influence_radius"),
+  influenceStrength: __t.f32().name("influence_strength"),
   get blackHole() {
     return __t.option(BlackHole).name("black_hole");
   },
