@@ -207,6 +207,9 @@ export const StarSystem = __t.object("StarSystem", {
   spectralType: __t.string(),
   starColor: __t.string(),
   starRadius: __t.f32(),
+  primaryMassSolar: __t.f32(),
+  influenceRadius: __t.f32(),
+  influenceStrength: __t.f32(),
   get blackHole() {
     return __t.option(BlackHole);
   },
@@ -301,6 +304,9 @@ export const VisibleStarSystem = __t.object("VisibleStarSystem", {
   spectralType: __t.string(),
   starColor: __t.string(),
   starRadius: __t.f32(),
+  primaryMassSolar: __t.f32(),
+  influenceRadius: __t.f32(),
+  influenceStrength: __t.f32(),
   get blackHole() {
     return __t.option(BlackHole);
   },

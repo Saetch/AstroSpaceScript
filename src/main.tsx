@@ -2,6 +2,7 @@ import { StrictMode, useMemo, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { Identity } from "spacetimedb";
 import { SpacetimeDBProvider } from "spacetimedb/react";
+import init from "rust-orbits";
 
 import App from "./App";
 import { AuthScreen } from "./AuthScreen";

@@ -205,7 +205,7 @@ export function UniverseSpaceTimeBridge() {
   const [systemRows, systemsReady] = useTable(tables.visible_systems)
   const [planetRows, planetsReady] = useTable(tables.visible_planets)
   const [moonRows, moonsReady] = useTable(tables.visible_moons)
-  const [clockRows] = useTable(tables.simulationClock)
+  //const [clockRows] = useTable(tables.simulationClock)
 
   const galaxies = useMemo(
     () => galaxyRows.map(convertGalaxy),
@@ -251,7 +251,7 @@ export function UniverseSpaceTimeBridge() {
     [planetsBySystemId, systemRows],
   )
 
-
+/*
   useEffect(() => {
     const sample = clockRows[0]
     if (!sample) return
@@ -260,7 +260,7 @@ export function UniverseSpaceTimeBridge() {
       timeScale: sample.timeScale,
       revision: sample.revision,
     })
-  }, [clockRows])
+  }, [clockRows]) */
 
   useEffect(() => {
     if (!galaxiesReady || !systemsReady || !planetsReady || !moonsReady) return
