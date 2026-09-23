@@ -15,6 +15,7 @@ import { yawForSubstellarMeshAxis } from '../procedural/tidalOrientation'
 import { MoonSystem } from '../components/MoonSystem'
 import { MoonFocusController, type MoonFocusTarget } from '../components/MoonFocusController'
 import { BlackHoleLensingPass } from '../components/BlackHoleLensingPass'
+import { LandedSpacecraftScene } from '../components/LandedSpacecraftScene'
 import { getSystemPrimaryColor, getSystemPrimaryRadius, isBlackHoleSystem, isGalacticCoreSystem, SystemPrimaryVisual } from '../components/SystemPrimary'
 import { MOON_UNITS_TO_INSPECTION_WORLD, PLANET_RADIUS_TO_INSPECTION_WORLD } from '../spatial/renderScales'
 import { orbitPositionAtTime, planetOrbitDefinition } from '../spatial/orbit'
@@ -700,6 +701,7 @@ export function PlanetScene({
                               seedKey,
                               selectedPointId,
                               colonizationSequence,
+                              landedSpacecraft,
                               onColonizationImpact,
                               onSelectPoint,
                             }: {
@@ -708,6 +710,11 @@ export function PlanetScene({
   seedKey: string
   selectedPointId?: string
   colonizationSequence: number
+  landedSpacecraft?: {
+    name: string
+    latitude: number
+    longitude: number
+  }
   onColonizationImpact: () => void
   onSelectPoint: (point?: SurfacePoint) => void
 }) {
@@ -818,6 +825,15 @@ export function PlanetScene({
                   />
                 </group>
             ))}
+            {landedSpacecraft && (
+                <LandedSpacecraftScene
+                    planet={planet}
+                    seedKey={seedKey}
+                    name={landedSpacecraft.name}
+                    latitude={landedSpacecraft.latitude}
+                    longitude={landedSpacecraft.longitude}
+                />
+            )}
           </group>
           <PlanetRings planet={planet} radius={radius} />
         </group>

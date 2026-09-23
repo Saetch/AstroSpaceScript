@@ -1,322 +1,630 @@
-import { GizmoHelper, GizmoViewport, MapControls, OrbitControls } from '@react-three/drei'
-import { Canvas } from '@react-three/fiber'
-import { useEffect, useMemo, useRef, useState } from 'react'
-import { MOUSE, MathUtils } from 'three'
-import type { PlanetTemperatureProfile, PlayerIdentity, SurfacePoint, ViewState } from './domain/universe'
-import { useUniverse } from './data/useUniverse'
-import { universeRepository } from './data/UniverseRepository'
-import { SceneEnvironment } from './components/SceneEnvironment'
-import { GalaxyOverviewScene } from './scenes/GalaxyOverviewScene'
-import { GalaxyScene } from './scenes/GalaxyScene'
-import { PlanetScene } from './scenes/PlanetScene'
-import { SolarSystemScene } from './scenes/SolarSystemScene'
-import { SpacecraftManeuverPanel } from './components/SpacecraftManeuverPanel'
-import { SpacecraftManeuverScene } from './components/SpacecraftManeuverScene'
-import { buildPlanetSeedKey } from './procedural/planetSeed'
-import { getSystemPrimaryColor, getSystemPrimaryLabel, isBlackHoleSystem, isGalacticCoreSystem } from './components/SystemPrimary'
-import { ownershipBadgeLabel, ownershipKey, ownershipTone, planetOwnershipLabel, playerRelationLabel, relationshipDescription, resolveOwnership, resolvePlanetOwnership, systemOwnershipLabel, territoryOwnershipLabel } from './domain/ownership'
-import { MOON_UNITS_TO_INSPECTION_WORLD, PLANET_RADIUS_TO_INSPECTION_WORLD, SYSTEM_UNITS_TO_WORLD } from './spatial/renderScales'
-import { resolveSystemInfluence } from './domain/systemInfluence'
-import { getSimulationTimeSeconds } from './spatial/simulationClock'
 import {
-  commitManeuverPreview,
-  createSpacecraftPlanFromPlanet,
+  GizmoHelper,
+  GizmoViewport,
+  MapControls,
+  OrbitControls,
+} from "@react-three/drei";
+import { Canvas } from "@react-three/fiber";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { MOUSE, MathUtils } from "three";
+import type {
+  PlanetTemperatureProfile,
+  PlayerIdentity,
+  SurfacePoint,
+  ViewState,
+} from "./domain/universe";
+import { useUniverse } from "./data/useUniverse";
+import { universeRepository } from "./data/UniverseRepository";
+import { SceneEnvironment } from "./components/SceneEnvironment";
+import { GalaxyOverviewScene } from "./scenes/GalaxyOverviewScene";
+import { GalaxyScene } from "./scenes/GalaxyScene";
+import { PlanetScene } from "./scenes/PlanetScene";
+import { SolarSystemScene } from "./scenes/SolarSystemScene";
+import { SpacecraftManeuverPanel } from "./components/SpacecraftManeuverPanel";
+import { SpacecraftManeuverScene } from "./components/SpacecraftManeuverScene";
+import { InfluenceZoneScene } from "./components/InfluenceZoneScene";
+import { TransferPredictionScene } from "./components/TransferPredictionScene";
+import { FutureBodyGhostScene } from "./components/FutureBodyGhostScene";
+import { buildPlanetSeedKey } from "./procedural/planetSeed";
+import {
+  getSystemPrimaryColor,
+  getSystemPrimaryLabel,
+  isBlackHoleSystem,
+  isGalacticCoreSystem,
+} from "./components/SystemPrimary";
+import {
+  ownershipBadgeLabel,
+  ownershipKey,
+  ownershipTone,
+  planetOwnershipLabel,
+  playerRelationLabel,
+  relationshipDescription,
+  resolveOwnership,
+  resolvePlanetOwnership,
+  systemOwnershipLabel,
+  territoryOwnershipLabel,
+} from "./domain/ownership";
+import {
+  MOON_UNITS_TO_INSPECTION_WORLD,
+  PLANET_RADIUS_TO_INSPECTION_WORLD,
+  SYSTEM_UNITS_TO_WORLD,
+} from "./spatial/renderScales";
+import {
+  bodyPositionRelativeTo,
+  bodySystemPositionAtTime,
+  findFlightBody,
+  transferTargetsForPrimary,
+} from "./spatial/flightInfluence";
+import { resolveSystemInfluence } from "./domain/systemInfluence";
+import { getSimulationTimeSeconds } from "./spatial/simulationClock";
+import {
+  advanceSpacecraftPlan,
+  clearPlannedManeuvers,
+  createLandedSpacecraftPlan,
+  draftManeuverExecutionTime,
+  predictFlightForecast,
   previewManeuver,
+  removePlannedManeuverAndFollowing,
+  scheduleManeuver,
+  takeOffSpacecraft,
   type ClientSpacecraftPlan,
   type ManeuverAxis,
-} from './spatial/spacecraftManeuver'
+} from "./spatial/spacecraftManeuver";
 
 const productionPresentation = [
-  { key: 'industry', label: 'Industry', icon: 'IND' },
-  { key: 'energy', label: 'Energy', icon: 'PWR' },
-  { key: 'resources', label: 'Resources', icon: 'RAW' },
-  { key: 'fuel', label: 'Fuel', icon: 'FUEL' },
-  { key: 'food', label: 'Food', icon: 'BIO' },
-  { key: 'research', label: 'Research', icon: 'R&D' },
-] as const
+  { key: "industry", label: "Industry", icon: "IND" },
+  { key: "energy", label: "Energy", icon: "PWR" },
+  { key: "resources", label: "Resources", icon: "RAW" },
+  { key: "fuel", label: "Fuel", icon: "FUEL" },
+  { key: "food", label: "Food", icon: "BIO" },
+  { key: "research", label: "Research", icon: "R&D" },
+] as const;
 
 function formatProduction(value: number) {
-  return new Intl.NumberFormat('en', { notation: 'compact', maximumFractionDigits: 1 }).format(value)
+  return new Intl.NumberFormat("en", {
+    notation: "compact",
+    maximumFractionDigits: 1,
+  }).format(value);
 }
 
 function formatSolarMass(value: number) {
-  return new Intl.NumberFormat('en', {
-    notation: value >= 10_000 ? 'compact' : 'standard',
+  return new Intl.NumberFormat("en", {
+    notation: value >= 10_000 ? "compact" : "standard",
     maximumFractionDigits: value < 10 ? 2 : 1,
-  }).format(value)
+  }).format(value);
 }
 
 function formatTemperature(value: number) {
-  return `${Math.round(value)} °C`
+  return `${Math.round(value)} °C`;
 }
 
 function temperatureExtent(temperature: PlanetTemperatureProfile) {
-  const values = [temperature.pole, temperature.equator, temperature.substellar, temperature.antistellar]
-  return `${Math.round(Math.min(...values))} to ${Math.round(Math.max(...values))} °C`
+  const values = [
+    temperature.pole,
+    temperature.equator,
+    temperature.substellar,
+    temperature.antistellar,
+  ];
+  return `${Math.round(Math.min(...values))} to ${Math.round(Math.max(...values))} °C`;
 }
 
-function connectionLabel(connection: ReturnType<typeof useUniverse>['connection']) {
-  if (connection === 'live') return 'SpaceTimeDB live'
-  if (connection === 'connecting') return 'Connecting'
-  if (connection === 'offline') return 'Offline cache'
-  return 'Mock universe'
+function connectionLabel(
+  connection: ReturnType<typeof useUniverse>["connection"],
+) {
+  if (connection === "live") return "SpaceTimeDB live";
+  if (connection === "connecting") return "Connecting";
+  if (connection === "offline") return "Offline cache";
+  return "Mock universe";
 }
 
-export default function App({ currentPlayer }: { currentPlayer: PlayerIdentity }) {
-  const universe = useUniverse()
-  const [view, setView] = useState<ViewState>({ type: 'universe' })
-  const [selectedPoint, setSelectedPoint] = useState<SurfacePoint>()
-  const [panelOpen, setPanelOpen] = useState(true)
-  const [galaxyOrientationReset, setGalaxyOrientationReset] = useState(0)
-  const [galaxyLabelsVisible, setGalaxyLabelsVisible] = useState(false)
-  const [colonizingPlanetId, setColonizingPlanetId] = useState<string>()
-  const [colonizationError, setColonizationError] = useState<string>()
-  const [colonizationSequence, setColonizationSequence] = useState(0)
-  const [transitionLabel, setTransitionLabel] = useState<string>()
-  const [spacecraftPlans, setSpacecraftPlans] = useState<Record<string, ClientSpacecraftPlan>>({})
-  const transitionTimer = useRef<number | undefined>(undefined)
-  const activeSystemId = view.type === 'system' || view.type === 'planet' ? view.systemId : undefined
+export default function App({
+  currentPlayer,
+}: {
+  currentPlayer: PlayerIdentity;
+}) {
+  const universe = useUniverse();
+  const [view, setView] = useState<ViewState>({ type: "universe" });
+  const [selectedPoint, setSelectedPoint] = useState<SurfacePoint>();
+  const [panelOpen, setPanelOpen] = useState(true);
+  const [galaxyOrientationReset, setGalaxyOrientationReset] = useState(0);
+  const [galaxyLabelsVisible, setGalaxyLabelsVisible] = useState(false);
+  const [colonizingPlanetId, setColonizingPlanetId] = useState<string>();
+  const [colonizationError, setColonizationError] = useState<string>();
+  const [colonizationSequence, setColonizationSequence] = useState(0);
+  const [transitionLabel, setTransitionLabel] = useState<string>();
+  const [spacecraftPlans, setSpacecraftPlans] = useState<
+    Record<string, ClientSpacecraftPlan>
+  >({});
+  const [flightClockTick, setFlightClockTick] = useState(0);
+  const [flightForecastPlan, setFlightForecastPlan] =
+    useState<ClientSpacecraftPlan>();
+  // Encounter geometry is deterministic between plan edits. Re-solve occasionally
+  // for a rolling horizon while UI ETAs count down locally every frame/tick.
+  const flightPredictionTick = Math.floor(flightClockTick / 50);
+  const handledInfluenceTransition = useRef<Record<string, number>>({});
+  const transitionTimer = useRef<number | undefined>(undefined);
+  const activeSystemId =
+    view.type === "system" || view.type === "planet"
+      ? view.systemId
+      : undefined;
 
   const galaxy = useMemo(
-      () => (view.type === 'universe' ? undefined : universe.galaxies.find((item) => item.id === view.galaxyId)),
-      [universe.galaxies, view],
-  )
+    () =>
+      view.type === "universe"
+        ? undefined
+        : universe.galaxies.find((item) => item.id === view.galaxyId),
+    [universe.galaxies, view],
+  );
   const galaxySystems = useMemo(
-      () => (galaxy ? universe.systems.filter((item) => item.galaxyId === galaxy.id) : []),
-      [galaxy, universe.systems],
-  )
+    () =>
+      galaxy
+        ? universe.systems.filter((item) => item.galaxyId === galaxy.id)
+        : [],
+    [galaxy, universe.systems],
+  );
   const galaxyTrafficRoutes = useMemo(
-      () => (galaxy ? universe.trafficRoutes.filter((route) => route.galaxyId === galaxy.id && route.active !== false) : []),
-      [galaxy, universe.trafficRoutes],
-  )
+    () =>
+      galaxy
+        ? universe.trafficRoutes.filter(
+            (route) => route.galaxyId === galaxy.id && route.active !== false,
+          )
+        : [],
+    [galaxy, universe.trafficRoutes],
+  );
   const system = useMemo(
-      () => (view.type === 'system' || view.type === 'planet'
-          ? universe.systems.find((item) => item.id === view.systemId)
-          : undefined),
-      [universe.systems, view],
-  )
+    () =>
+      view.type === "system" || view.type === "planet"
+        ? universe.systems.find((item) => item.id === view.systemId)
+        : undefined,
+    [universe.systems, view],
+  );
   const planet = useMemo(
-      () => (view.type === 'planet' ? system?.planets.find((item) => item.id === view.planetId) : undefined),
-      [system, view],
-  )
-  const systemIsCore = system ? isGalacticCoreSystem(system) : false
-  const systemColonized = systemIsCore ? false : system?.planets.some((item) => item.colonized) ?? false
-  const systemOwnership = system ? resolveOwnership(system.owner, currentPlayer) : undefined
-  const planetOwnership = planet && system ? resolvePlanetOwnership(planet, system, currentPlayer) : undefined
-  const systemOwnershipTone = ownershipTone(systemOwnership)
-  const planetOwnershipTone = ownershipTone(planetOwnership)
-  const systemInfluence = system ? resolveSystemInfluence(system) : undefined
-  const panelRelationshipClass = view.type === 'system' && system && !systemIsCore
+    () =>
+      view.type === "planet"
+        ? system?.planets.find((item) => item.id === view.planetId)
+        : undefined,
+    [system, view],
+  );
+  const systemIsCore = system ? isGalacticCoreSystem(system) : false;
+  const systemColonized = systemIsCore
+    ? false
+    : (system?.planets.some((item) => item.colonized) ?? false);
+  const systemOwnership = system
+    ? resolveOwnership(system.owner, currentPlayer)
+    : undefined;
+  const planetOwnership =
+    planet && system
+      ? resolvePlanetOwnership(planet, system, currentPlayer)
+      : undefined;
+  const canLaunchFromPlanet = planetOwnership?.relation === "self";
+  const systemOwnershipTone = ownershipTone(systemOwnership);
+  const planetOwnershipTone = ownershipTone(planetOwnership);
+  const systemInfluence = system ? resolveSystemInfluence(system) : undefined;
+  const panelRelationshipClass =
+    view.type === "system" && system && !systemIsCore
       ? `relationship-panel relationship-panel--${systemOwnershipTone}`
-      : view.type === 'planet' && planet
-          ? `relationship-panel relationship-panel--${planetOwnershipTone}`
-          : ''
-  const activeSpacecraftPlan = system ? spacecraftPlans[system.id] : undefined
-  const activeManeuverPreview = useMemo(
-    () => activeSpacecraftPlan && system
-      ? previewManeuver(activeSpacecraftPlan, system.primaryMassSolar ?? 1)
-      : undefined,
+      : view.type === "planet" && planet
+        ? `relationship-panel relationship-panel--${planetOwnershipTone}`
+        : "";
+  const activeSpacecraftPlan = system ? spacecraftPlans[system.id] : undefined;
+  const activeFlightBody = useMemo(
+    () =>
+      activeSpacecraftPlan && system
+        ? findFlightBody(system, activeSpacecraftPlan.primaryBodyId)
+        : undefined,
     [activeSpacecraftPlan, system],
-  )
+  );
+  const activeManeuverPreview = useMemo(
+    () =>
+      activeSpacecraftPlan &&
+      activeFlightBody &&
+      activeSpacecraftPlan.flightState === "orbiting"
+        ? previewManeuver(
+            activeSpacecraftPlan,
+            activeFlightBody.gravitationalParameter,
+            activeFlightBody.bodyRadius * 1.01,
+          )
+        : undefined,
+    [activeFlightBody, activeSpacecraftPlan],
+  );
+  const activeTransferTargets = useMemo(
+    () =>
+      activeSpacecraftPlan &&
+      system &&
+      activeSpacecraftPlan.flightState === "orbiting"
+        ? transferTargetsForPrimary(system, activeSpacecraftPlan.primaryBodyId)
+        : [],
+    [activeSpacecraftPlan, system],
+  );
+  useEffect(() => {
+    if (
+      !activeSpacecraftPlan ||
+      !system ||
+      activeSpacecraftPlan.flightState !== "orbiting"
+    ) {
+      setFlightForecastPlan(undefined);
+      return;
+    }
 
-  useEffect(() => () => {
-    if (transitionTimer.current !== undefined) window.clearTimeout(transitionTimer.current)
-  }, [])
+    // Long-horizon encounter solving can inspect thousands of candidate points.
+    // Keep the immediate orbit preview live, but wait until maneuver input settles
+    // before running that expensive search. Scheduler-only cursor updates preserve
+    // the nested orbit/maneuver references and therefore do not restart this timer.
+    const timer = window.setTimeout(
+      () => setFlightForecastPlan(activeSpacecraftPlan),
+      220,
+    );
+    return () => window.clearTimeout(timer);
+  }, [
+    activeSpacecraftPlan?.flightState,
+    activeSpacecraftPlan?.primaryBodyId,
+    activeSpacecraftPlan?.orbit,
+    activeSpacecraftPlan?.maneuver,
+    activeSpacecraftPlan?.maneuverQueue,
+    activeSpacecraftPlan?.transferTargetBodyId,
+    system,
+  ]);
+
+  const activeFlightForecast = useMemo(
+    () =>
+      flightForecastPlan &&
+      system &&
+      flightForecastPlan.flightState === "orbiting"
+        ? predictFlightForecast(
+            flightForecastPlan,
+            system,
+            getSimulationTimeSeconds(),
+          )
+        : undefined,
+    [flightForecastPlan, flightPredictionTick, system],
+  );
+  const activeInfluencePrediction = activeFlightForecast?.nextTransition;
+  const activeTargetApproach = activeFlightForecast?.targetApproach;
+  const activeDraftExecutionTime = useMemo(
+    () =>
+      activeSpacecraftPlan?.flightState === "orbiting"
+        ? draftManeuverExecutionTime(
+            activeSpacecraftPlan,
+            getSimulationTimeSeconds(),
+          )
+        : undefined,
+    [activeSpacecraftPlan, flightClockTick],
+  );
+
+  useEffect(
+    () => () => {
+      if (transitionTimer.current !== undefined)
+        window.clearTimeout(transitionTimer.current);
+    },
+    [],
+  );
 
   useEffect(() => {
-    if (!activeSystemId) return
-    universeRepository.retainSystem(activeSystemId)
-    return () => universeRepository.releaseSystem(activeSystemId)
-  }, [activeSystemId])
+    const timer = window.setInterval(() => {
+      const now = getSimulationTimeSeconds();
+      setFlightClockTick((value) => value + 1);
+      setSpacecraftPlans((current) => {
+        let changed = false;
+        const next = { ...current };
+        for (const [systemId, plan] of Object.entries(current)) {
+          const planSystem = universe.systems.find(
+            (candidate) => candidate.id === systemId,
+          );
+          if (!planSystem) continue;
+          const advanced = advanceSpacecraftPlan(plan, planSystem, now);
+          if (advanced !== plan) {
+            next[systemId] = advanced;
+            changed = true;
+          }
+        }
+        return changed ? next : current;
+      });
+    }, 100);
+    return () => window.clearInterval(timer);
+  }, [universe.systems]);
+
+  useEffect(() => {
+    if (
+      !system ||
+      !activeSpacecraftPlan ||
+      activeSpacecraftPlan.transitionSerial <= 0
+    )
+      return;
+    const handled = handledInfluenceTransition.current[system.id] ?? 0;
+    if (activeSpacecraftPlan.transitionSerial <= handled) return;
+    handledInfluenceTransition.current[system.id] =
+      activeSpacecraftPlan.transitionSerial;
+
+    const body = findFlightBody(system, activeSpacecraftPlan.primaryBodyId);
+    if (!body) return;
+    if (body.kind === "star") {
+      setView({
+        type: "system",
+        galaxyId: system.galaxyId,
+        systemId: system.id,
+      });
+      setPanelOpen(true);
+      return;
+    }
+    if (body.planetId) {
+      setView({
+        type: "planet",
+        galaxyId: system.galaxyId,
+        systemId: system.id,
+        planetId: body.planetId,
+      });
+      setPanelOpen(true);
+    }
+  }, [activeSpacecraftPlan, system]);
+
+  useEffect(() => {
+    if (!activeSystemId) return;
+    universeRepository.retainSystem(activeSystemId);
+    return () => universeRepository.releaseSystem(activeSystemId);
+  }, [activeSystemId]);
 
   const planetSeedKey = useMemo(() => {
-    if (!system || !planet) return undefined
-    const planetIndex = system.planets.findIndex((item) => item.id === planet.id)
-    return buildPlanetSeedKey(system.position, planet.orbitIndex ?? planetIndex)
-  }, [planet, system])
+    if (!system || !planet) return undefined;
+    const planetIndex = system.planets.findIndex(
+      (item) => item.id === planet.id,
+    );
+    return buildPlanetSeedKey(
+      system.position,
+      planet.orbitIndex ?? planetIndex,
+    );
+  }, [planet, system]);
 
   const territorySummaries = useMemo(() => {
-    const groups = new Map<string, {
-      color: string
-      name: string
-      systems: number
-      strength: number
-      reach: number
-    }>()
+    const groups = new Map<
+      string,
+      {
+        color: string;
+        name: string;
+        systems: number;
+        strength: number;
+        reach: number;
+      }
+    >();
 
     galaxySystems.forEach((item) => {
-      if (!item.zoneColor) return
-      const baseInfluence = resolveSystemInfluence(item)
-      const influenceRadius = typeof item.zoneRadius === 'number' && Number.isFinite(item.zoneRadius) && item.zoneRadius > 0
-        ? item.zoneRadius
-        : baseInfluence.influenceRadius
-      const influenceStrength = typeof item.zoneStrength === 'number' && Number.isFinite(item.zoneStrength) && item.zoneStrength > 0
-        ? item.zoneStrength
-        : baseInfluence.influenceStrength
-      const ownership = resolveOwnership(item.owner, currentPlayer)
-      const key = `${item.zoneColor.toLowerCase()}:${ownershipKey(item.owner)}`
-      const current = groups.get(key)
+      if (!item.zoneColor) return;
+      const baseInfluence = resolveSystemInfluence(item);
+      const influenceRadius =
+        typeof item.zoneRadius === "number" &&
+        Number.isFinite(item.zoneRadius) &&
+        item.zoneRadius > 0
+          ? item.zoneRadius
+          : baseInfluence.influenceRadius;
+      const influenceStrength =
+        typeof item.zoneStrength === "number" &&
+        Number.isFinite(item.zoneStrength) &&
+        item.zoneStrength > 0
+          ? item.zoneStrength
+          : baseInfluence.influenceStrength;
+      const ownership = resolveOwnership(item.owner, currentPlayer);
+      const key = `${item.zoneColor.toLowerCase()}:${ownershipKey(item.owner)}`;
+      const current = groups.get(key);
       if (current) {
-        current.systems += 1
-        current.strength += influenceStrength
-        current.reach = Math.max(current.reach, influenceRadius)
+        current.systems += 1;
+        current.strength += influenceStrength;
+        current.reach = Math.max(current.reach, influenceRadius);
       } else {
         groups.set(key, {
           color: item.zoneColor,
-          name: ownership.relation === 'unclaimed'
-              ? item.zoneName ?? item.faction
+          name:
+            ownership.relation === "unclaimed"
+              ? (item.zoneName ?? item.faction)
               : territoryOwnershipLabel(ownership),
           systems: 1,
           strength: influenceStrength,
           reach: influenceRadius,
-        })
+        });
       }
-    })
+    });
 
     return [...groups.entries()].map(([id, territory]) => ({
       id,
       ...territory,
-    }))  }, [currentPlayer, galaxySystems])
+    }));
+  }, [currentPlayer, galaxySystems]);
 
   const systemOrbitWorldExtent = useMemo(() => {
-    if (!system || system.planets.length === 0) return 0
+    if (!system || system.planets.length === 0) return 0;
 
     const outerOrbit = Math.max(
-      ...system.planets.map((candidate) =>
-        candidate.orbitRadius * (1 + (candidate.orbitEccentricity ?? 0)),
+      ...system.planets.map(
+        (candidate) =>
+          candidate.orbitRadius * (1 + (candidate.orbitEccentricity ?? 0)),
       ),
       8,
-    )
+    );
 
-    return outerOrbit * SYSTEM_UNITS_TO_WORLD
-  }, [system])
+    return outerOrbit * SYSTEM_UNITS_TO_WORLD;
+  }, [system]);
 
   const systemCameraDistance = useMemo(() => {
-    if (!system) return 42
+    if (!system) return 42;
     if (isGalacticCoreSystem(system)) {
-      const diskRadius = system.blackHole?.accretionDisk?.outerRadius ?? 18
-      return MathUtils.clamp(diskRadius * 18, 320, 5200)
+      const diskRadius = system.blackHole?.accretionDisk?.outerRadius ?? 18;
+      return MathUtils.clamp(diskRadius * 18, 320, 5200);
     }
-    return MathUtils.clamp(systemOrbitWorldExtent * 3.2, 160, 5200)
-  }, [system, systemOrbitWorldExtent])
+    return MathUtils.clamp(systemOrbitWorldExtent * 3.2, 160, 5200);
+  }, [system, systemOrbitWorldExtent]);
 
   const systemCameraMaxDistance = MathUtils.clamp(
     Math.max(systemCameraDistance * 12, systemOrbitWorldExtent * 40),
     28000,
     180000,
-  )
+  );
   const systemCameraFarDistance = Math.max(
     systemCameraMaxDistance * 1.35,
     systemCameraMaxDistance + systemOrbitWorldExtent * 2.5 + 4000,
-  )
+  );
 
   const planetCameraMaxDistance = useMemo(() => {
-    if (!planet) return 80
+    if (!planet) return 80;
 
-    const parentRadius = planet.radius * PLANET_RADIUS_TO_INSPECTION_WORLD
+    const parentRadius = planet.radius * PLANET_RADIUS_TO_INSPECTION_WORLD;
     const outerMoonExtent = (planet.moons ?? []).reduce((maximum, moon) => {
-      const apoapsis = moon.orbitRadius
-        * (1 + (moon.orbitEccentricity ?? 0))
-        * MOON_UNITS_TO_INSPECTION_WORLD
-      const bodyRadius = Math.max(0.07, moon.radius * 2.15)
-      return Math.max(maximum, apoapsis + bodyRadius)
-    }, parentRadius)
+      const apoapsis =
+        moon.orbitRadius *
+        (1 + (moon.orbitEccentricity ?? 0)) *
+        MOON_UNITS_TO_INSPECTION_WORLD;
+      const bodyRadius = Math.max(0.07, moon.radius * 2.15);
+      return Math.max(maximum, apoapsis + bodyRadius);
+    }, parentRadius);
 
-    return MathUtils.clamp(outerMoonExtent * 5, 80, 1600)
-  }, [planet])
+    const flightBody = system ? findFlightBody(system, planet.id) : undefined;
+    const influenceExtent =
+      (flightBody?.influenceRadius ?? 0) * MOON_UNITS_TO_INSPECTION_WORLD;
+    return MathUtils.clamp(
+      Math.max(outerMoonExtent * 5, influenceExtent * 1.15),
+      80,
+      5200,
+    );
+  }, [planet, system]);
 
   const camera =
-      view.type === 'universe'
-          ? { position: [0, 690, 980] as [number, number, number], fov: 46, near: 0.1, far: 5000 }
-          : view.type === 'galaxy'
-              ? { position: [0, 3440, 5520] as [number, number, number], fov: 46, near: 0.1, far: 24000 }
-              : view.type === 'system'
-                  ? { position: [0, systemCameraDistance * 0.56, systemCameraDistance] as [number, number, number], fov: 46, near: 0.1, far: systemCameraFarDistance }
-                  : { position: [0, 1.2, 9] as [number, number, number], fov: 42, near: 0.1, far: Math.max(planetCameraMaxDistance * 2, 3000) }
+    view.type === "universe"
+      ? {
+          position: [0, 690, 980] as [number, number, number],
+          fov: 46,
+          near: 0.1,
+          far: 5000,
+        }
+      : view.type === "galaxy"
+        ? {
+            position: [0, 3440, 5520] as [number, number, number],
+            fov: 46,
+            near: 0.1,
+            far: 24000,
+          }
+        : view.type === "system"
+          ? {
+              position: [
+                0,
+                systemCameraDistance * 0.56,
+                systemCameraDistance,
+              ] as [number, number, number],
+              fov: 46,
+              near: 0.1,
+              far: systemCameraFarDistance,
+            }
+          : {
+              position: [0, 1.2, 9] as [number, number, number],
+              fov: 42,
+              near: 0.1,
+              far: Math.max(planetCameraMaxDistance * 2, 3000),
+            };
 
   function transitionTo(nextView: ViewState, label: string) {
-    if (transitionTimer.current !== undefined) window.clearTimeout(transitionTimer.current)
-    setTransitionLabel(label)
-    window.requestAnimationFrame(() => setView(nextView))
-    transitionTimer.current = window.setTimeout(() => setTransitionLabel(undefined), 560)
+    if (transitionTimer.current !== undefined)
+      window.clearTimeout(transitionTimer.current);
+    setTransitionLabel(label);
+    window.requestAnimationFrame(() => setView(nextView));
+    transitionTimer.current = window.setTimeout(
+      () => setTransitionLabel(undefined),
+      560,
+    );
   }
 
   function openUniverse() {
-    setSelectedPoint(undefined)
-    transitionTo({ type: 'universe' }, 'Resolving known-galaxy catalog')
+    setSelectedPoint(undefined);
+    transitionTo({ type: "universe" }, "Resolving known-galaxy catalog");
   }
 
   function openGalaxy(galaxyId: string) {
-    const nextGalaxy = universe.galaxies.find((item) => item.id === galaxyId)
-    setSelectedPoint(undefined)
-    setGalaxyLabelsVisible(false)
-    transitionTo({ type: 'galaxy', galaxyId }, `Reconstructing ${nextGalaxy?.name ?? 'galaxy'}`)
-    setPanelOpen(true)
+    const nextGalaxy = universe.galaxies.find((item) => item.id === galaxyId);
+    setSelectedPoint(undefined);
+    setGalaxyLabelsVisible(false);
+    transitionTo(
+      { type: "galaxy", galaxyId },
+      `Reconstructing ${nextGalaxy?.name ?? "galaxy"}`,
+    );
+    setPanelOpen(true);
   }
 
   function openSystem(systemId: string) {
-    const nextSystem = universe.systems.find((item) => item.id === systemId)
-    if (!nextSystem) return
-    setSelectedPoint(undefined)
+    const nextSystem = universe.systems.find((item) => item.id === systemId);
+    if (!nextSystem) return;
+    setSelectedPoint(undefined);
 
     // Returning from a planet to its already-retained parent system is local
     // navigation. Skip the artificial transit delay and use the cached system
     // record plus cached procedural maps immediately.
-    if (view.type === 'planet' && view.systemId === systemId) {
-      if (transitionTimer.current !== undefined) window.clearTimeout(transitionTimer.current)
-      setTransitionLabel(undefined)
-      setView({ type: 'system', galaxyId: nextSystem.galaxyId, systemId })
-      setPanelOpen(true)
-      return
+    if (view.type === "planet" && view.systemId === systemId) {
+      if (transitionTimer.current !== undefined)
+        window.clearTimeout(transitionTimer.current);
+      setTransitionLabel(undefined);
+      setView({ type: "system", galaxyId: nextSystem.galaxyId, systemId });
+      setPanelOpen(true);
+      return;
     }
 
     transitionTo(
-        { type: 'system', galaxyId: nextSystem.galaxyId, systemId },
-        `Resolving ${nextSystem.name}`,
-    )
-    setPanelOpen(true)
+      { type: "system", galaxyId: nextSystem.galaxyId, systemId },
+      `Resolving ${nextSystem.name}`,
+    );
+    setPanelOpen(true);
   }
 
   function openPlanet(planetId: string) {
-    if (!system) return
-    const nextPlanet = system.planets.find((item) => item.id === planetId)
-    setSelectedPoint(undefined)
-    setColonizationError(undefined)
+    if (!system) return;
+    const nextPlanet = system.planets.find((item) => item.id === planetId);
+    setSelectedPoint(undefined);
+    setColonizationError(undefined);
     transitionTo(
-        { type: 'planet', galaxyId: system.galaxyId, systemId: system.id, planetId },
-        `Loading ${nextPlanet?.name ?? 'planet'} survey`,
-    )
-    setPanelOpen(true)
+      {
+        type: "planet",
+        galaxyId: system.galaxyId,
+        systemId: system.id,
+        planetId,
+      },
+      `Loading ${nextPlanet?.name ?? "planet"} survey`,
+    );
+    setPanelOpen(true);
   }
 
   function beginColonization() {
-    if (!planet || planet.colonized || colonizingPlanetId) return
-    setColonizationError(undefined)
-    setColonizingPlanetId(planet.id)
-    setColonizationSequence((value) => value + 1)
+    if (!planet || planet.colonized || colonizingPlanetId) return;
+    setColonizationError(undefined);
+    setColonizingPlanetId(planet.id);
+    setColonizationSequence((value) => value + 1);
   }
 
   async function completeColonizationImpact() {
-    if (!system || !planet || planet.colonized) return
+    if (!system || !planet || planet.colonized) return;
     try {
-      await universeRepository.colonizePlanet(system.id, planet.id)
+      await universeRepository.colonizePlanet(system.id, planet.id);
     } catch (error) {
-      setColonizationError(error instanceof Error ? error.message : 'Colonization request failed.')
+      setColonizationError(
+        error instanceof Error ? error.message : "Colonization request failed.",
+      );
     } finally {
-      window.setTimeout(() => setColonizingPlanetId(undefined), 180)
+      window.setTimeout(() => setColonizingPlanetId(undefined), 180);
     }
   }
 
-  function launchLocalSpacecraftFromPlanet() {
-    if (!system || !planet) return
-    const plan = createSpacecraftPlanFromPlanet(system, planet, getSimulationTimeSeconds())
+  function prepareLocalSpacecraftFromPlanet() {
+    if (!system || !planet || !canLaunchFromPlanet) return;
+    const plan = createLandedSpacecraftPlan(
+      system,
+      planet,
+      getSimulationTimeSeconds(),
+    );
     setSpacecraftPlans((current) => ({
       ...current,
       [system.id]: plan,
-    }))
-    // Maneuver planning is performed in the parent system frame. The ship starts at
-    // the selected planet's current orbital position, then becomes its own local node.
-    openSystem(system.id)
+    }));
+  }
+
+  function takeOffLocalSpacecraft() {
+    if (!system || !planet || !activeSpacecraftPlan || !canLaunchFromPlanet)
+      return;
+    if (activeSpacecraftPlan.launchPlanetId !== planet.id) return;
+    updateActiveSpacecraft((plan) =>
+      takeOffSpacecraft(plan, system, planet, getSimulationTimeSeconds()),
+    );
   }
 
   function setActiveDeltaV(axis: ManeuverAxis, value: number) {
@@ -326,642 +634,1241 @@ export default function App({ currentPlayer }: { currentPlayer: PlayerIdentity }
         ...plan.maneuver,
         deltaV: { ...plan.maneuver.deltaV, [axis]: value },
       },
-    }))
+    }));
   }
 
-  function updateActiveSpacecraft(mutator: (plan: ClientSpacecraftPlan) => ClientSpacecraftPlan) {
-    if (!system) return
+  function setActiveBurnPhase(burnPhase: number) {
+    updateActiveSpacecraft((plan) => ({
+      ...plan,
+      maneuver: { ...plan.maneuver, burnPhase },
+    }));
+  }
+
+  function setActiveOrbitPass(orbitPass: number) {
+    updateActiveSpacecraft((plan) => ({
+      ...plan,
+      maneuver: {
+        ...plan.maneuver,
+        orbitPass: Math.max(0, Math.min(999, Math.floor(orbitPass))),
+      },
+    }));
+  }
+
+  function setActiveTransferTarget(bodyId: string | undefined) {
+    updateActiveSpacecraft((plan) => ({
+      ...plan,
+      transferTargetBodyId: bodyId,
+    }));
+  }
+
+  function updateActiveSpacecraft(
+    mutator: (plan: ClientSpacecraftPlan) => ClientSpacecraftPlan,
+  ) {
+    if (!system) return;
     setSpacecraftPlans((current) => {
-      const plan = current[system.id]
-      if (!plan) return current
-      return { ...current, [system.id]: mutator(plan) }
-    })
+      const plan = current[system.id];
+      if (!plan) return current;
+      return { ...current, [system.id]: mutator(plan) };
+    });
   }
 
   function removeLocalSpacecraft() {
-    if (!system) return
+    if (!system) return;
     setSpacecraftPlans((current) => {
-      const next = { ...current }
-      delete next[system.id]
-      return next
-    })
+      const next = { ...current };
+      delete next[system.id];
+      return next;
+    });
   }
 
-  function commitActiveManeuver() {
-    if (!activeSpacecraftPlan || !activeManeuverPreview) return
-    updateActiveSpacecraft((plan) => commitManeuverPreview(
-      plan,
-      activeManeuverPreview,
-      getSimulationTimeSeconds(),
-    ))
+  function scheduleActiveManeuver() {
+    if (!activeSpacecraftPlan || !activeManeuverPreview || !activeFlightBody)
+      return;
+    updateActiveSpacecraft((plan) =>
+      scheduleManeuver(
+        plan,
+        getSimulationTimeSeconds(),
+        activeFlightBody.gravitationalParameter,
+        activeFlightBody.bodyRadius * 1.01,
+      ),
+    );
+  }
+
+  function clearActiveManeuvers() {
+    updateActiveSpacecraft((plan) =>
+      clearPlannedManeuvers(plan, getSimulationTimeSeconds()),
+    );
+  }
+
+  function removeActivePlannedNode(nodeId: string) {
+    updateActiveSpacecraft((plan) =>
+      removePlannedManeuverAndFollowing(
+        plan,
+        nodeId,
+        getSimulationTimeSeconds(),
+      ),
+    );
+  }
+
+  function resetActiveManeuver() {
+    updateActiveSpacecraft((plan) => ({
+      ...plan,
+      maneuver: {
+        ...plan.maneuver,
+        deltaV: { prograde: 0, radial: 0, normal: 0 },
+      },
+    }));
   }
 
   return (
-      <main className="app-shell">
-        <Canvas
-            key={
-              view.type === 'universe'
-                  ? 'universe'
-                  : view.type === 'galaxy'
-                      ? `galaxy:${view.galaxyId}`
-                      : view.type === 'system'
-                          ? `system:${view.systemId}`
-                          : `planet:${view.planetId}`
-            }
-            camera={camera}
-            dpr={[1, 1.75]}
-            gl={{
-              antialias: true,
-              powerPreference: 'high-performance',
-            }}
-        >
-          <SceneEnvironment mode={view.type} />
-          {view.type === 'universe' && (
-              <GalaxyOverviewScene galaxies={universe.galaxies} onOpenGalaxy={openGalaxy} />
+    <main className="app-shell">
+      <Canvas
+        key={
+          view.type === "universe"
+            ? "universe"
+            : view.type === "galaxy"
+              ? `galaxy:${view.galaxyId}`
+              : view.type === "system"
+                ? `system:${view.systemId}`
+                : `planet:${view.planetId}`
+        }
+        camera={camera}
+        dpr={[1, 1.75]}
+        gl={{
+          antialias: true,
+          powerPreference: "high-performance",
+        }}
+        onContextMenu={(event) => event.preventDefault()}
+      >
+        <SceneEnvironment mode={view.type} />
+        {view.type === "universe" && (
+          <GalaxyOverviewScene
+            galaxies={universe.galaxies}
+            onOpenGalaxy={openGalaxy}
+          />
+        )}
+        {view.type === "galaxy" && galaxy && (
+          <GalaxyScene
+            galaxy={galaxy}
+            systems={galaxySystems}
+            trafficRoutes={galaxyTrafficRoutes}
+            resetOrientationToken={galaxyOrientationReset}
+            onLabelsVisibilityChange={setGalaxyLabelsVisible}
+            onOpenSystem={openSystem}
+            currentPlayer={currentPlayer}
+            followRotation={true}
+          />
+        )}
+        {view.type === "system" && system && (
+          <>
+            <SolarSystemScene system={system} onOpenPlanet={openPlanet} />
+            <InfluenceZoneScene
+              system={system}
+              activeBodyId={activeSpacecraftPlan?.primaryBodyId}
+              renderScale={SYSTEM_UNITS_TO_WORLD}
+            />
+            {activeSpacecraftPlan?.flightState === "orbiting" && (
+              <>
+                <TransferPredictionScene
+                  system={system}
+                  prediction={activeInfluencePrediction}
+                  targetApproach={activeTargetApproach}
+                  renderScale={SYSTEM_UNITS_TO_WORLD}
+                />
+                <FutureBodyGhostScene
+                  system={system}
+                  atSimulationTime={activeDraftExecutionTime}
+                  nowSimulationTime={getSimulationTimeSeconds()}
+                  renderScale={SYSTEM_UNITS_TO_WORLD}
+                />
+              </>
+            )}
+          </>
+        )}
+        {view.type === "system" &&
+          system &&
+          activeSpacecraftPlan &&
+          activeManeuverPreview &&
+          activeFlightBody && (
+            <SpacecraftManeuverScene
+              plan={activeSpacecraftPlan}
+              preview={activeManeuverPreview}
+              gravitationalParameter={activeFlightBody.gravitationalParameter}
+              renderScale={SYSTEM_UNITS_TO_WORLD}
+              originPositionAtTime={(time) => {
+                const origin = bodySystemPositionAtTime(
+                  system,
+                  activeFlightBody.id,
+                  time,
+                );
+                return [
+                  origin[0] * SYSTEM_UNITS_TO_WORLD,
+                  origin[1] * SYSTEM_UNITS_TO_WORLD,
+                  origin[2] * SYSTEM_UNITS_TO_WORLD,
+                ];
+              }}
+              onDeltaVChange={setActiveDeltaV}
+            />
           )}
-          {view.type === 'galaxy' && galaxy && (
-              <GalaxyScene
-                  galaxy={galaxy}
-                  systems={galaxySystems}
-                  trafficRoutes={galaxyTrafficRoutes}
-                  resetOrientationToken={galaxyOrientationReset}
-                  onLabelsVisibilityChange={setGalaxyLabelsVisible}
-                  onOpenSystem={openSystem}
-                  currentPlayer={currentPlayer}
-                  followRotation={true}
-              />
-          )}
-          {view.type === 'system' && system && <SolarSystemScene system={system} onOpenPlanet={openPlanet} />}
-          {view.type === 'system' && activeSpacecraftPlan && activeManeuverPreview && (
-              <SpacecraftManeuverScene
+        {view.type === "planet" && planet && system && (
+          <>
+            <PlanetScene
+              system={system}
+              planet={planet}
+              seedKey={planetSeedKey ?? `${system.id}::0`}
+              selectedPointId={selectedPoint?.id}
+              colonizationSequence={
+                colonizingPlanetId === planet.id ? colonizationSequence : 0
+              }
+              landedSpacecraft={
+                activeSpacecraftPlan?.flightState === "landed" &&
+                activeSpacecraftPlan.launchPlanetId === planet.id
+                  ? {
+                      name: activeSpacecraftPlan.name,
+                      latitude: activeSpacecraftPlan.launchSurface.latitude,
+                      longitude: activeSpacecraftPlan.launchSurface.longitude,
+                    }
+                  : undefined
+              }
+              onColonizationImpact={completeColonizationImpact}
+              onSelectPoint={setSelectedPoint}
+            />
+            <InfluenceZoneScene
+              system={system}
+              activeBodyId={activeSpacecraftPlan?.primaryBodyId}
+              renderScale={MOON_UNITS_TO_INSPECTION_WORLD}
+              referencePlanetId={planet.id}
+            />
+            {activeSpacecraftPlan?.flightState === "orbiting" && (
+              <>
+                <TransferPredictionScene
+                  system={system}
+                  prediction={activeInfluencePrediction}
+                  targetApproach={activeTargetApproach}
+                  renderScale={MOON_UNITS_TO_INSPECTION_WORLD}
+                  referenceBodyId={planet.id}
+                />
+                <FutureBodyGhostScene
+                  system={system}
+                  atSimulationTime={activeDraftExecutionTime}
+                  nowSimulationTime={getSimulationTimeSeconds()}
+                  renderScale={MOON_UNITS_TO_INSPECTION_WORLD}
+                  referenceBodyId={planet.id}
+                />
+              </>
+            )}
+            {activeSpacecraftPlan &&
+              activeManeuverPreview &&
+              activeFlightBody &&
+              activeFlightBody.kind !== "star" &&
+              activeFlightBody.planetId === planet.id && (
+                <SpacecraftManeuverScene
                   plan={activeSpacecraftPlan}
                   preview={activeManeuverPreview}
-                  primaryMassSolar={system?.primaryMassSolar ?? 1}
+                  gravitationalParameter={
+                    activeFlightBody.gravitationalParameter
+                  }
+                  renderScale={MOON_UNITS_TO_INSPECTION_WORLD}
+                  originPositionAtTime={(time) => {
+                    const origin = bodyPositionRelativeTo(
+                      system,
+                      activeFlightBody.id,
+                      planet.id,
+                      time,
+                    );
+                    return [
+                      origin[0] * MOON_UNITS_TO_INSPECTION_WORLD,
+                      origin[1] * MOON_UNITS_TO_INSPECTION_WORLD,
+                      origin[2] * MOON_UNITS_TO_INSPECTION_WORLD,
+                    ];
+                  }}
                   onDeltaVChange={setActiveDeltaV}
-              />
-          )}
-          {view.type === 'planet' && planet && (
-              <PlanetScene
-                  system={system!}
-                  planet={planet}
-                  seedKey={planetSeedKey ?? `${system?.id ?? 'unknown'}::0`}
-                  selectedPointId={selectedPoint?.id}
-                  colonizationSequence={colonizingPlanetId === planet.id ? colonizationSequence : 0}
-                  onColonizationImpact={completeColonizationImpact}
-                  onSelectPoint={setSelectedPoint}
-              />
-          )}
-
-          {view.type === 'universe' ? (
-              <MapControls
-                  makeDefault
-                  enableDamping
-                  minDistance={260}
-                  maxDistance={2200}
-                  minPolarAngle={0.3}
-                  maxPolarAngle={Math.PI / 2 - 0.1}
-                  dampingFactor={0.055}
-                  screenSpacePanning={false}
-                  mouseButtons={{ LEFT: MOUSE.ROTATE, MIDDLE: MOUSE.DOLLY, RIGHT: MOUSE.PAN }}
-                  zoomToCursor
-              />
-          ) : view.type === 'galaxy' ? (
-              <MapControls
-                  makeDefault
-                  enableDamping
-                  minDistance={110}
-                  maxDistance={10400}
-                  minPolarAngle={0.24}
-                  maxPolarAngle={Math.PI / 2 - 0.08}
-                  dampingFactor={0.055}
-                  screenSpacePanning={false}
-                  mouseButtons={{ LEFT: MOUSE.ROTATE, MIDDLE: MOUSE.DOLLY, RIGHT: MOUSE.PAN }}
-                  zoomToCursor
-              />
-          ) : (
-              <OrbitControls
-                  makeDefault
-                  enablePan={view.type !== 'planet'}
-                  minDistance={view.type === 'planet' ? 0.7 : 0.85}
-                  maxDistance={view.type === 'system' ? systemCameraMaxDistance : planetCameraMaxDistance}
-                  minPolarAngle={0.22}
-                  maxPolarAngle={Math.PI - 0.22}
-                  dampingFactor={0.055}
-                  zoomToCursor
-              />
-          )}
-          <GizmoHelper alignment="bottom-right" margin={[84, 84]}>
-            <GizmoViewport axisColors={['#e26d7c', '#67d89d', '#6f91ff']} labelColor="white" />
-          </GizmoHelper>
-        </Canvas>
-
-        {view.type === 'system' && activeSpacecraftPlan && activeManeuverPreview && (
-            <SpacecraftManeuverPanel
-                plan={activeSpacecraftPlan}
-                preview={activeManeuverPreview}
-                onBurnPhaseChange={(burnPhase) => updateActiveSpacecraft((plan) => ({
-                  ...plan,
-                  maneuver: { ...plan.maneuver, burnPhase },
-                }))}
-                onDeltaVChange={setActiveDeltaV}
-                onCommit={commitActiveManeuver}
-                onReset={() => updateActiveSpacecraft((plan) => ({
-                  ...plan,
-                  maneuver: {
-                    ...plan.maneuver,
-                    deltaV: { prograde: 0, radial: 0, normal: 0 },
-                  },
-                }))}
-                onRemove={removeLocalSpacecraft}
-            />
+                />
+              )}
+          </>
         )}
 
-        <div className={`scene-transition ${transitionLabel ? 'scene-transition--active' : ''}`} aria-hidden={!transitionLabel}>
-          <svg className="scene-transition__ship" viewBox="0 0 140 72" aria-hidden="true">
-            <defs>
-              <linearGradient id="transition-hull" x1="0" y1="0" x2="1" y2="1">
-                <stop offset="0" stopColor="#e9f6ff" />
-                <stop offset="0.48" stopColor="#7694ad" />
-                <stop offset="1" stopColor="#17283a" />
-              </linearGradient>
-              <linearGradient id="transition-wing" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0" stopColor="#91aec5" />
-                <stop offset="1" stopColor="#1b3044" />
-              </linearGradient>
-            </defs>
-            <path className="scene-transition__ship-wing" fill="url(#transition-wing)" d="M57 31 15 8 34 35 15 64 58 43Z" />
-            <path className="scene-transition__ship-wing" fill="url(#transition-wing)" d="M83 31 125 8 106 35 125 64 82 43Z" />
-            <path className="scene-transition__ship-hull" fill="url(#transition-hull)" d="M70 3 88 31 82 58 70 69 58 58 52 31Z" />
-            <path className="scene-transition__ship-cockpit" d="M70 13 79 32 75 43 65 43 61 32Z" />
-            <circle className="scene-transition__ship-engine" cx="61" cy="57" r="3" />
-            <circle className="scene-transition__ship-engine" cx="79" cy="57" r="3" />
-          </svg>
-          <div className="scene-transition__reticle"><i /><i /><i /></div>
-          <strong>{transitionLabel ?? 'Resolving scene'}</strong>
-          <span>ATLAS NAVIGATION</span>
-        </div>
+        {view.type === "universe" ? (
+          <MapControls
+            makeDefault
+            enableDamping
+            minDistance={260}
+            maxDistance={2200}
+            minPolarAngle={0.3}
+            maxPolarAngle={Math.PI / 2 - 0.1}
+            dampingFactor={0.055}
+            screenSpacePanning={false}
+            mouseButtons={{
+              LEFT: MOUSE.ROTATE,
+              MIDDLE: MOUSE.DOLLY,
+              RIGHT: MOUSE.PAN,
+            }}
+            zoomToCursor
+          />
+        ) : view.type === "galaxy" ? (
+          <MapControls
+            makeDefault
+            enableDamping
+            minDistance={110}
+            maxDistance={10400}
+            minPolarAngle={0.24}
+            maxPolarAngle={Math.PI / 2 - 0.08}
+            dampingFactor={0.055}
+            screenSpacePanning={false}
+            mouseButtons={{
+              LEFT: MOUSE.ROTATE,
+              MIDDLE: MOUSE.DOLLY,
+              RIGHT: MOUSE.PAN,
+            }}
+            zoomToCursor
+          />
+        ) : (
+          <OrbitControls
+            makeDefault
+            enablePan
+            minDistance={view.type === "planet" ? 0.7 : 0.85}
+            maxDistance={
+              view.type === "system"
+                ? systemCameraMaxDistance
+                : planetCameraMaxDistance
+            }
+            minPolarAngle={0.22}
+            maxPolarAngle={Math.PI - 0.22}
+            dampingFactor={0.055}
+            mouseButtons={{
+              LEFT: MOUSE.ROTATE,
+              MIDDLE: MOUSE.DOLLY,
+              RIGHT: MOUSE.PAN,
+            }}
+            zoomToCursor
+          />
+        )}
+        <GizmoHelper alignment="bottom-right" margin={[84, 84]}>
+          <GizmoViewport
+            axisColors={["#e26d7c", "#67d89d", "#6f91ff"]}
+            labelColor="white"
+          />
+        </GizmoHelper>
+      </Canvas>
 
-        <header className="topbar glass-panel">
-          <button className="brand" onClick={openUniverse}>
-            <span className="brand__mark">A</span>
-            <span>
+      {(view.type === "system" || view.type === "planet") &&
+        activeSpacecraftPlan?.flightState === "orbiting" &&
+        activeManeuverPreview &&
+        activeFlightBody && (
+          <SpacecraftManeuverPanel
+            plan={activeSpacecraftPlan}
+            preview={activeManeuverPreview}
+            primaryBody={activeFlightBody}
+            influencePrediction={activeInfluencePrediction}
+            targetBodies={activeTransferTargets}
+            targetApproach={activeTargetApproach}
+            onTargetChange={setActiveTransferTarget}
+            onBurnPhaseChange={setActiveBurnPhase}
+            onOrbitPassChange={setActiveOrbitPass}
+            onDeltaVChange={setActiveDeltaV}
+            onSchedule={scheduleActiveManeuver}
+            onRemovePlannedNode={removeActivePlannedNode}
+            onClearPlannedNodes={clearActiveManeuvers}
+            onReset={resetActiveManeuver}
+            onRemove={removeLocalSpacecraft}
+          />
+        )}
+
+      <div
+        className={`scene-transition ${transitionLabel ? "scene-transition--active" : ""}`}
+        aria-hidden={!transitionLabel}
+      >
+        <svg
+          className="scene-transition__ship"
+          viewBox="0 0 140 72"
+          aria-hidden="true"
+        >
+          <defs>
+            <linearGradient id="transition-hull" x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0" stopColor="#e9f6ff" />
+              <stop offset="0.48" stopColor="#7694ad" />
+              <stop offset="1" stopColor="#17283a" />
+            </linearGradient>
+            <linearGradient id="transition-wing" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0" stopColor="#91aec5" />
+              <stop offset="1" stopColor="#1b3044" />
+            </linearGradient>
+          </defs>
+          <path
+            className="scene-transition__ship-wing"
+            fill="url(#transition-wing)"
+            d="M57 31 15 8 34 35 15 64 58 43Z"
+          />
+          <path
+            className="scene-transition__ship-wing"
+            fill="url(#transition-wing)"
+            d="M83 31 125 8 106 35 125 64 82 43Z"
+          />
+          <path
+            className="scene-transition__ship-hull"
+            fill="url(#transition-hull)"
+            d="M70 3 88 31 82 58 70 69 58 58 52 31Z"
+          />
+          <path
+            className="scene-transition__ship-cockpit"
+            d="M70 13 79 32 75 43 65 43 61 32Z"
+          />
+          <circle
+            className="scene-transition__ship-engine"
+            cx="61"
+            cy="57"
+            r="3"
+          />
+          <circle
+            className="scene-transition__ship-engine"
+            cx="79"
+            cy="57"
+            r="3"
+          />
+        </svg>
+        <div className="scene-transition__reticle">
+          <i />
+          <i />
+          <i />
+        </div>
+        <strong>{transitionLabel ?? "Resolving scene"}</strong>
+        <span>ATLAS NAVIGATION</span>
+      </div>
+
+      <header className="topbar glass-panel">
+        <button className="brand" onClick={openUniverse}>
+          <span className="brand__mark">A</span>
+          <span>
             <strong>ATLAS</strong>
             <small>SHARED UNIVERSE</small>
           </span>
-          </button>
-          <nav className="breadcrumbs" aria-label="Breadcrumb">
-            <button onClick={openUniverse}>Galaxies</button>
-            {galaxy && (
-                <>
-                  <span>/</span>
-                  <button onClick={() => openGalaxy(galaxy.id)}>{galaxy.name}</button>
-                </>
-            )}
-            {system && (
-                <>
-                  <span>/</span>
-                  <button onClick={() => openSystem(system.id)}>{system.name}</button>
-                </>
-            )}
-            {planet && (
-                <>
-                  <span>/</span>
-                  <strong>{planet.name}</strong>
-                </>
-            )}
-          </nav>
-          <div className="network-state">
-            <span className={`status-dot status-dot--${universe.connection}`} />
-            <span>{connectionLabel(universe.connection)}</span>
-            <strong>{universe.onlinePlayers} online</strong>
-          </div>
-        </header>
+        </button>
+        <nav className="breadcrumbs" aria-label="Breadcrumb">
+          <button onClick={openUniverse}>Galaxies</button>
+          {galaxy && (
+            <>
+              <span>/</span>
+              <button onClick={() => openGalaxy(galaxy.id)}>
+                {galaxy.name}
+              </button>
+            </>
+          )}
+          {system && (
+            <>
+              <span>/</span>
+              <button onClick={() => openSystem(system.id)}>
+                {system.name}
+              </button>
+            </>
+          )}
+          {planet && (
+            <>
+              <span>/</span>
+              <strong>{planet.name}</strong>
+            </>
+          )}
+        </nav>
+        <div className="network-state">
+          <span className={`status-dot status-dot--${universe.connection}`} />
+          <span>{connectionLabel(universe.connection)}</span>
+          <strong>{universe.onlinePlayers} online</strong>
+        </div>
+      </header>
 
-        {view.type === 'planet' && galaxy && (
-            <button className="planet-galaxy-return glass-panel" onClick={() => openGalaxy(galaxy.id)}>
-              <span>←</span>
-              <span>
+      {view.type === "planet" && galaxy && (
+        <button
+          className="planet-galaxy-return glass-panel"
+          onClick={() => openGalaxy(galaxy.id)}
+        >
+          <span>←</span>
+          <span>
             <small>RETURN TO GALAXY</small>
             <strong>{galaxy.name}</strong>
           </span>
-            </button>
-        )}
-
-        <section className={`scene-title ${view.type === 'planet' ? 'scene-title--with-return' : ''}`}>
-        <span className="eyebrow">
-          {view.type === 'universe'
-              ? 'KNOWN-GALAXY MAP'
-              : view.type === 'galaxy'
-                  ? 'GALACTIC MAP'
-                  : view.type === 'system'
-                      ? (systemIsCore
-                          ? 'GALACTIC CORE'
-                          : systemOwnership?.relation === 'self'
-                              ? 'YOUR SYSTEM'
-                              : systemOwnership?.relation === 'other'
-                                  ? `${playerRelationLabel(systemOwnership)} SYSTEM`.toUpperCase()
-                                  : 'UNCLAIMED SYSTEM')
-                      : 'PLANETARY SURVEY'}
-        </span>
-          <h1>
-            {view.type === 'universe'
-                ? 'The Observable Frontier'
-                : view.type === 'galaxy'
-                    ? galaxy?.name
-                    : view.type === 'system'
-                        ? system?.name
-                        : planet?.name}
-          </h1>
-          <p>
-            {view.type === 'universe'
-                ? 'Select a visible galaxy to enter its local map. The backend controls which galaxies are currently known to the player.'
-                : view.type === 'galaxy'
-                    ? (galaxySystems.length > 0
-                        ? 'A full-scale galaxy surrounds its highlighted charted region. Zoom toward registered systems to reveal their names.'
-                        : 'This galaxy is visible to the player, but no local navigation anchors or system registry have been unlocked yet.')
-                    : view.type === 'system'
-                        ? (systemIsCore
-                            ? 'Inspect the supermassive singularity, its incandescent accretion flow, photon ring, and polar jets.'
-                            : systemOwnership?.relation === 'self'
-                                ? 'This system belongs to you. Select a world to open its seeded procedural survey view.'
-                                : systemOwnership?.relation === 'other'
-                                    ? `Claimed by ${systemOwnership.playerName ?? 'another player'}. ${relationshipDescription(systemOwnership)}`
-                                    : 'No permanent population or territorial claim is registered here. Survey a candidate world to establish the first colony.')
-                        : 'Drag to orbit. City lights are population-driven and remain visible across the night side.'}
-          </p>
-        </section>
-
-        {view.type === 'galaxy' && !galaxyLabelsVisible && territorySummaries.length > 0 && (
-            <section className="territory-overview glass-panel">
-              <div className="territory-overview__heading">
-                <span>MERGED TERRITORIES</span>
-                <strong>{territorySummaries.length}</strong>
-              </div>
-              {territorySummaries.map((territory) => (
-                  <div
-                      key={territory.id}
-                      className="territory-overview__zone"
-                  >              <i style={{ background: territory.color, boxShadow: `0 0 18px ${territory.color}` }} />
-                    <span>
-                <strong>{territory.name}</strong>
-                <small>{territory.systems} anchors · {territory.strength.toFixed(1)} influence · {territory.reach} reach</small>
-              </span>
-                  </div>
-              ))}
-              <p>Systems with the same color reinforce one merged field. Competing colors resolve their frontier from reach and influence.</p>
-            </section>
-        )}
-
-        {view.type === 'galaxy' && (
-            <div className="galaxy-map-controls">
-              <button
-                  className="orientation-reset"
-                  onClick={() => {
-                    setGalaxyOrientationReset((value) => value + 1)
-                  }}
-              >
-                <span>⌖</span>
-                Reset map orientation
-              </button>
-            </div>
-        )}
-
-        <button className="panel-toggle" onClick={() => setPanelOpen((value) => !value)} aria-expanded={panelOpen}>
-          {panelOpen ? 'Hide intel' : 'Show intel'}
         </button>
+      )}
 
-        {panelOpen && (
-            <aside className={`info-panel glass-panel ${panelRelationshipClass}`}>
-              {view.type === 'universe' && (
-                  <>
-                    <div className="panel-heading">
-                      <span>Visible catalog</span>
-                      <strong>{universe.galaxies.length} galaxies</strong>
-                    </div>
-                    <p className="panel-copy">
-                      This list is authoritative snapshot data. Adding or removing a galaxy in the backend changes which destinations appear here.
-                    </p>
-                    <div className="galaxy-list">
-                      {universe.galaxies.map((item) => {
-                        const registeredSystems = universe.systems.filter((systemItem) => systemItem.galaxyId === item.id).length
-                        return (
-                            <button key={item.id} onClick={() => openGalaxy(item.id)}>
-                              <i style={{ background: item.primaryColor, boxShadow: `0 0 20px ${item.primaryColor}` }} />
-                              <span>
+      <section
+        className={`scene-title ${view.type === "planet" ? "scene-title--with-return" : ""}`}
+      >
+        <span className="eyebrow">
+          {view.type === "universe"
+            ? "KNOWN-GALAXY MAP"
+            : view.type === "galaxy"
+              ? "GALACTIC MAP"
+              : view.type === "system"
+                ? systemIsCore
+                  ? "GALACTIC CORE"
+                  : systemOwnership?.relation === "self"
+                    ? "YOUR SYSTEM"
+                    : systemOwnership?.relation === "other"
+                      ? `${playerRelationLabel(systemOwnership)} SYSTEM`.toUpperCase()
+                      : "UNCLAIMED SYSTEM"
+                : "PLANETARY SURVEY"}
+        </span>
+        <h1>
+          {view.type === "universe"
+            ? "The Observable Frontier"
+            : view.type === "galaxy"
+              ? galaxy?.name
+              : view.type === "system"
+                ? system?.name
+                : planet?.name}
+        </h1>
+        <p>
+          {view.type === "universe"
+            ? "Select a visible galaxy to enter its local map. The backend controls which galaxies are currently known to the player."
+            : view.type === "galaxy"
+              ? galaxySystems.length > 0
+                ? "A full-scale galaxy surrounds its highlighted charted region. Zoom toward registered systems to reveal their names."
+                : "This galaxy is visible to the player, but no local navigation anchors or system registry have been unlocked yet."
+              : view.type === "system"
+                ? systemIsCore
+                  ? "Inspect the supermassive singularity, its incandescent accretion flow, photon ring, and polar jets."
+                  : systemOwnership?.relation === "self"
+                    ? "This system belongs to you. Select a world to open its seeded procedural survey view."
+                    : systemOwnership?.relation === "other"
+                      ? `Claimed by ${systemOwnership.playerName ?? "another player"}. ${relationshipDescription(systemOwnership)}`
+                      : "No permanent population or territorial claim is registered here. Survey a candidate world to establish the first colony."
+                : "Drag to orbit. City lights are population-driven and remain visible across the night side."}
+        </p>
+      </section>
+
+      {view.type === "galaxy" &&
+        !galaxyLabelsVisible &&
+        territorySummaries.length > 0 && (
+          <section className="territory-overview glass-panel">
+            <div className="territory-overview__heading">
+              <span>MERGED TERRITORIES</span>
+              <strong>{territorySummaries.length}</strong>
+            </div>
+            {territorySummaries.map((territory) => (
+              <div key={territory.id} className="territory-overview__zone">
+                {" "}
+                <i
+                  style={{
+                    background: territory.color,
+                    boxShadow: `0 0 18px ${territory.color}`,
+                  }}
+                />
+                <span>
+                  <strong>{territory.name}</strong>
+                  <small>
+                    {territory.systems} anchors ·{" "}
+                    {territory.strength.toFixed(1)} influence ·{" "}
+                    {territory.reach} reach
+                  </small>
+                </span>
+              </div>
+            ))}
+            <p>
+              Systems with the same color reinforce one merged field. Competing
+              colors resolve their frontier from reach and influence.
+            </p>
+          </section>
+        )}
+
+      {view.type === "galaxy" && (
+        <div className="galaxy-map-controls">
+          <button
+            className="orientation-reset"
+            onClick={() => {
+              setGalaxyOrientationReset((value) => value + 1);
+            }}
+          >
+            <span>⌖</span>
+            Reset map orientation
+          </button>
+        </div>
+      )}
+
+      <button
+        className="panel-toggle"
+        onClick={() => setPanelOpen((value) => !value)}
+        aria-expanded={panelOpen}
+      >
+        {panelOpen ? "Hide intel" : "Show intel"}
+      </button>
+
+      {panelOpen && (
+        <aside className={`info-panel glass-panel ${panelRelationshipClass}`}>
+          {view.type === "universe" && (
+            <>
+              <div className="panel-heading">
+                <span>Visible catalog</span>
+                <strong>{universe.galaxies.length} galaxies</strong>
+              </div>
+              <p className="panel-copy">
+                This list is authoritative snapshot data. Adding or removing a
+                galaxy in the backend changes which destinations appear here.
+              </p>
+              <div className="galaxy-list">
+                {universe.galaxies.map((item) => {
+                  const registeredSystems = universe.systems.filter(
+                    (systemItem) => systemItem.galaxyId === item.id,
+                  ).length;
+                  return (
+                    <button key={item.id} onClick={() => openGalaxy(item.id)}>
+                      <i
+                        style={{
+                          background: item.primaryColor,
+                          boxShadow: `0 0 20px ${item.primaryColor}`,
+                        }}
+                      />
+                      <span>
                         <strong>{item.name}</strong>
-                        <small>{item.companions?.length ? `${item.morphology} group · ${item.companions.length + 1} members` : item.morphology} · {item.estimatedSystems}</small>
+                        <small>
+                          {item.companions?.length
+                            ? `${item.morphology} group · ${item.companions.length + 1} members`
+                            : item.morphology}{" "}
+                          · {item.estimatedSystems}
+                        </small>
                       </span>
-                              <b>{registeredSystems > 0 ? `${registeredSystems} mapped` : 'VISIBLE'}</b>
-                            </button>
-                        )
-                      })}
-                    </div>
-                  </>
+                      <b>
+                        {registeredSystems > 0
+                          ? `${registeredSystems} mapped`
+                          : "VISIBLE"}
+                      </b>
+                    </button>
+                  );
+                })}
+              </div>
+            </>
+          )}
+
+          {view.type === "galaxy" && galaxy && (
+            <>
+              <div className="panel-heading">
+                <span>{galaxy.morphology}</span>
+                <strong>{galaxy.estimatedSystems}</strong>
+              </div>
+              <p className="panel-copy">{galaxy.description}</p>
+              <dl className="fact-grid">
+                <div>
+                  <dt>Cataloged by</dt>
+                  <dd>{galaxy.discoveredBy}</dd>
+                </div>
+                <div>
+                  <dt>Registered systems</dt>
+                  <dd>{galaxySystems.length}</dd>
+                </div>
+                <div>
+                  <dt>Galaxy members</dt>
+                  <dd>{1 + (galaxy.companions?.length ?? 0)}</dd>
+                </div>
+                <div>
+                  <dt>Traffic routes</dt>
+                  <dd>{galaxyTrafficRoutes.length}</dd>
+                </div>
+              </dl>
+              {galaxy.companions && galaxy.companions.length > 0 && (
+                <section className="moon-roster">
+                  <span>
+                    {galaxy.companions.some(
+                      (companion) =>
+                        companion.interaction?.phase !== undefined &&
+                        companion.interaction.phase !== "bound",
+                    )
+                      ? "INTERACTING COMPANIONS"
+                      : "BOUND COMPANIONS"}
+                  </span>
+                  <div>
+                    {galaxy.companions.map((companion) => (
+                      <small key={companion.id}>
+                        {companion.name} · {companion.morphology}
+                        {companion.interaction
+                          ? ` · ${companion.interaction.phase}`
+                          : ""}
+                      </small>
+                    ))}
+                  </div>
+                </section>
+              )}
+              {galaxyTrafficRoutes.length > 0 && (
+                <section className="traffic-network">
+                  <div className="traffic-network__heading">
+                    <span>INTER-SYSTEM TRAFFIC</span>
+                    <small>{galaxyTrafficRoutes.length} active routes</small>
+                  </div>
+                  <div className="traffic-network__routes">
+                    {galaxyTrafficRoutes.map((route) => {
+                      const from = galaxySystems.find(
+                        (candidate) => candidate.id === route.fromSystemId,
+                      );
+                      const to = galaxySystems.find(
+                        (candidate) => candidate.id === route.toSystemId,
+                      );
+                      if (!from || !to) return null;
+                      const fallbackLoad = Math.min(
+                        1,
+                        Math.max(0, route.traffic),
+                      );
+                      const fromToLoad = Math.round(
+                        Math.min(
+                          1,
+                          Math.max(0, route.trafficFromTo ?? fallbackLoad),
+                        ) * 100,
+                      );
+                      const toFromLoad = Math.round(
+                        Math.min(
+                          1,
+                          Math.max(0, route.trafficToFrom ?? fallbackLoad),
+                        ) * 100,
+                      );
+                      const directionalLoads =
+                        route.direction === "bidirectional" &&
+                        (route.trafficFromTo !== undefined ||
+                          route.trafficToFrom !== undefined);
+                      return (
+                        <div key={route.id} className="traffic-network__route">
+                          <i
+                            style={{
+                              background: route.color ?? "#79dfff",
+                              boxShadow: `0 0 14px ${route.color ?? "#79dfff"}`,
+                            }}
+                          />
+                          <span>
+                            <strong>
+                              {route.label ?? `${from.name}–${to.name}`}
+                            </strong>
+                            <small>
+                              {route.direction === "from-to"
+                                ? `${from.name} → ${to.name}`
+                                : route.direction === "to-from"
+                                  ? `${to.name} → ${from.name}`
+                                  : `${from.name} ↔ ${to.name}`}{" "}
+                              · {route.kind ?? "mixed"}
+                            </small>
+                          </span>
+                          {directionalLoads ? (
+                            <b className="traffic-network__loads">
+                              <em>{fromToLoad}% →</em>
+                              <em>← {toFromLoad}%</em>
+                            </b>
+                          ) : (
+                            <b>{Math.round(fallbackLoad * 100)}%</b>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                  <p>
+                    Lane curves stop at offset transfer gates. Traffic load
+                    controls packet density and route brightness.
+                  </p>
+                </section>
               )}
 
-              {view.type === 'galaxy' && galaxy && (
-                  <>
-                    <div className="panel-heading">
-                      <span>{galaxy.morphology}</span>
-                      <strong>{galaxy.estimatedSystems}</strong>
-                    </div>
-                    <p className="panel-copy">{galaxy.description}</p>
-                    <dl className="fact-grid">
-                      <div><dt>Cataloged by</dt><dd>{galaxy.discoveredBy}</dd></div>
-                      <div><dt>Registered systems</dt><dd>{galaxySystems.length}</dd></div>
-                      <div><dt>Galaxy members</dt><dd>{1 + (galaxy.companions?.length ?? 0)}</dd></div>
-                      <div><dt>Traffic routes</dt><dd>{galaxyTrafficRoutes.length}</dd></div>
-                    </dl>
-                    {galaxy.companions && galaxy.companions.length > 0 && (
-                        <section className="moon-roster">
-                          <span>{galaxy.companions.some((companion) => companion.interaction?.phase !== undefined && companion.interaction.phase !== 'bound') ? 'INTERACTING COMPANIONS' : 'BOUND COMPANIONS'}</span>
-                          <div>
-                            {galaxy.companions.map((companion) => (
-                                <small key={companion.id}>
-                                  {companion.name} · {companion.morphology}
-                                  {companion.interaction ? ` · ${companion.interaction.phase}` : ''}
-                                </small>
-                            ))}
-                          </div>
-                        </section>
-                    )}
-                    {galaxyTrafficRoutes.length > 0 && (
-                        <section className="traffic-network">
-                          <div className="traffic-network__heading">
-                            <span>INTER-SYSTEM TRAFFIC</span>
-                            <small>{galaxyTrafficRoutes.length} active routes</small>
-                          </div>
-                          <div className="traffic-network__routes">
-                            {galaxyTrafficRoutes.map((route) => {
-                              const from = galaxySystems.find((candidate) => candidate.id === route.fromSystemId)
-                              const to = galaxySystems.find((candidate) => candidate.id === route.toSystemId)
-                              if (!from || !to) return null
-                              const fallbackLoad = Math.min(1, Math.max(0, route.traffic))
-                              const fromToLoad = Math.round(Math.min(1, Math.max(0, route.trafficFromTo ?? fallbackLoad)) * 100)
-                              const toFromLoad = Math.round(Math.min(1, Math.max(0, route.trafficToFrom ?? fallbackLoad)) * 100)
-                              const directionalLoads = route.direction === 'bidirectional'
-                                  && (route.trafficFromTo !== undefined || route.trafficToFrom !== undefined)
-                              return (
-                                  <div key={route.id} className="traffic-network__route">
-                                    <i style={{ background: route.color ?? '#79dfff', boxShadow: `0 0 14px ${route.color ?? '#79dfff'}` }} />
-                                    <span>
-                            <strong>{route.label ?? `${from.name}–${to.name}`}</strong>
-                            <small>{route.direction === 'from-to' ? `${from.name} → ${to.name}` : route.direction === 'to-from' ? `${to.name} → ${from.name}` : `${from.name} ↔ ${to.name}`} · {route.kind ?? 'mixed'}</small>
-                          </span>
-                                    {directionalLoads ? (
-                                        <b className="traffic-network__loads">
-                                          <em>{fromToLoad}% →</em>
-                                          <em>← {toFromLoad}%</em>
-                                        </b>
-                                    ) : (
-                                        <b>{Math.round(fallbackLoad * 100)}%</b>
-                                    )}
-                                  </div>
-                              )
-                            })}
-                          </div>
-                          <p>Lane curves stop at offset transfer gates. Traffic load controls packet density and route brightness.</p>
-                        </section>
-                    )}
-
-                    {galaxySystems.length > 0 ? (
-                        <div className="system-list">
-                          {galaxySystems.map((item) => {
-                            const galacticCore = isGalacticCoreSystem(item)
-                            const ownership = resolveOwnership(item.owner, currentPlayer)
-                            const ownershipLabel = systemOwnershipLabel(ownership)
-                            const tone = ownershipTone(ownership)
-                            return (
-                                <button
-                                    key={item.id}
-                                    className={galacticCore ? 'system-list__core' : `relationship-card relationship-card--${tone}`}
-                                    onClick={() => openSystem(item.id)}
-                                >
-                                  <span className="star-swatch" style={{ background: getSystemPrimaryColor(item) }} />
-                                  <span>
+              {galaxySystems.length > 0 ? (
+                <div className="system-list">
+                  {galaxySystems.map((item) => {
+                    const galacticCore = isGalacticCoreSystem(item);
+                    const ownership = resolveOwnership(
+                      item.owner,
+                      currentPlayer,
+                    );
+                    const ownershipLabel = systemOwnershipLabel(ownership);
+                    const tone = ownershipTone(ownership);
+                    return (
+                      <button
+                        key={item.id}
+                        className={
+                          galacticCore
+                            ? "system-list__core"
+                            : `relationship-card relationship-card--${tone}`
+                        }
+                        onClick={() => openSystem(item.id)}
+                      >
+                        <span
+                          className="star-swatch"
+                          style={{ background: getSystemPrimaryColor(item) }}
+                        />
+                        <span>
                           <strong>{item.name}</strong>
                           <small>
                             {galacticCore
-                                ? `${getSystemPrimaryLabel(item)} · galactic center`
-                                : isBlackHoleSystem(item)
-                                    ? `${getSystemPrimaryLabel(item)} · ${ownershipLabel}`
-                                    : ownership.relation === 'unclaimed'
-                                        ? 'UNCLAIMED · colonization candidate'
-                                        : `${ownershipLabel} · ${item.faction}`}
+                              ? `${getSystemPrimaryLabel(item)} · galactic center`
+                              : isBlackHoleSystem(item)
+                                ? `${getSystemPrimaryLabel(item)} · ${ownershipLabel}`
+                                : ownership.relation === "unclaimed"
+                                  ? "UNCLAIMED · colonization candidate"
+                                  : `${ownershipLabel} · ${item.faction}`}
                           </small>
                         </span>
-                                  <b>{galacticCore ? 'CORE' : ownershipBadgeLabel(ownership)}</b>
-                                </button>
-                            )
-                          })}
-                        </div>
-                    ) : (
-                        <div className="empty-registry">
-                          <span>NO LOCAL REGISTRY</span>
-                          <strong>Galaxy visible, systems unavailable</strong>
-                          <p>Expansion or survey progress can later add star systems under this galaxy ID through the backend snapshot.</p>
-                        </div>
-                    )}
-                  </>
+                        <b>
+                          {galacticCore
+                            ? "CORE"
+                            : ownershipBadgeLabel(ownership)}
+                        </b>
+                      </button>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="empty-registry">
+                  <span>NO LOCAL REGISTRY</span>
+                  <strong>Galaxy visible, systems unavailable</strong>
+                  <p>
+                    Expansion or survey progress can later add star systems
+                    under this galaxy ID through the backend snapshot.
+                  </p>
+                </div>
               )}
+            </>
+          )}
 
-              {view.type === 'system' && system && (
-                  <>
-                    <div className="panel-heading">
-                      <span>{getSystemPrimaryLabel(system)}</span>
-                      <strong>{systemIsCore ? 'Galactic center' : systemColonized ? system.population : 'No residents'}</strong>
-                    </div>
-                    <p className="panel-copy">{system.description}</p>
-                    <div className={`system-claim-state ${systemIsCore ? 'system-claim-state--core' : `relationship-card relationship-card--${systemOwnershipTone}`}`}>
+          {view.type === "system" && system && (
+            <>
+              <div className="panel-heading">
+                <span>{getSystemPrimaryLabel(system)}</span>
+                <strong>
+                  {systemIsCore
+                    ? "Galactic center"
+                    : systemColonized
+                      ? system.population
+                      : "No residents"}
+                </strong>
+              </div>
+              <p className="panel-copy">{system.description}</p>
+              <div
+                className={`system-claim-state ${systemIsCore ? "system-claim-state--core" : `relationship-card relationship-card--${systemOwnershipTone}`}`}
+              >
                 <span>
                   {systemIsCore
-                      ? 'CORE CLASSIFICATION'
-                      : systemOwnership?.relation === 'self'
-                          ? 'YOUR SYSTEM'
-                          : systemOwnership?.relation === 'other'
-                              ? `${playerRelationLabel(systemOwnership).toUpperCase()} CLAIM`
-                              : 'COLONIZATION STATUS'}
+                    ? "CORE CLASSIFICATION"
+                    : systemOwnership?.relation === "self"
+                      ? "YOUR SYSTEM"
+                      : systemOwnership?.relation === "other"
+                        ? `${playerRelationLabel(systemOwnership).toUpperCase()} CLAIM`
+                        : "COLONIZATION STATUS"}
                 </span>
-                      <strong>
-                        {systemIsCore
-                            ? 'Supermassive central singularity'
-                            : systemOwnership?.relation === 'self'
-                                ? 'Your system'
-                                : systemOwnership?.relation === 'other'
-                                    ? systemOwnership.playerName
-                                    : 'Outside every registered territory'}
-                      </strong>
-                      <small>
-                        {systemIsCore
-                            ? 'A backend-defined galactic landmark. It is selectable like a system, but is not colonizable.'
-                            : systemOwnership?.relation === 'self'
-                                ? `Owned by ${currentPlayer.name}. This system contributes influence to your territorial field.`
-                                : systemOwnership?.relation === 'other'
-                                    ? `${relationshipDescription(systemOwnership)} This system contributes influence to ${systemOwnership.playerName ?? 'that player'}’s territorial field.`
-                                    : `${system.planets.filter((candidate) => !candidate.colonized).length} uncolonized world available for survey.`}
-                      </small>
-                    </div>
-                    <dl className="fact-grid">
-                      <div><dt>Owner</dt><dd>{systemIsCore ? 'Core registry' : systemOwnership?.relation === 'self' ? 'You' : systemOwnership?.relation === 'other' ? systemOwnership.playerName : 'Unclaimed'}</dd></div>
-                      <div><dt>Relation</dt><dd>{systemIsCore ? 'Independent registry' : playerRelationLabel(systemOwnership)}</dd></div>
-                      <div><dt>Authority</dt><dd>{systemIsCore ? 'Core registry' : systemColonized ? system.faction : 'None'}</dd></div>
-                      <div><dt>Worlds</dt><dd>{system.planets.length}</dd></div>
-                      <div><dt>Primary</dt><dd>{isBlackHoleSystem(system) ? 'Black hole' : 'Star'}</dd></div>
-                      <div><dt>Primary mass</dt><dd>{formatSolarMass(systemInfluence?.primaryMassSolar ?? 1)} M☉</dd></div>
-                      <div><dt>Influence range</dt><dd>{(systemInfluence?.influenceRadius ?? 38).toFixed(1)} map units</dd></div>
-                      <div><dt>Influence strength</dt><dd>{(systemInfluence?.influenceStrength ?? 0.54).toFixed(2)}</dd></div>
-                      {isBlackHoleSystem(system) && system.blackHole && (
-                          <>
-                            <div><dt>Spin</dt><dd>{system.blackHole.spin.toFixed(2)}</dd></div>
-                            <div><dt>Accretion</dt><dd>{system.blackHole.accretionDisk ? 'Active disc' : 'Quiescent'}</dd></div>
-                          </>
-                      )}
-                    </dl>
-                    {system.planets.length > 0 ? (
-                        <div className="system-list">
-                          {system.planets.map((item) => {
-                            const ownership = resolvePlanetOwnership(item, system, currentPlayer)
-                            const tone = ownershipTone(ownership)
-                            return (
-                                <button key={item.id} className={`relationship-card relationship-card--${tone}`} onClick={() => openPlanet(item.id)}>
-                                  <span className="planet-swatch" style={{ background: item.color }} />
-                                  <span>
-                          <strong>{item.name}</strong>
-                          <small>{item.type} · {planetOwnershipLabel(ownership)}</small>
-                        </span>
-                                  <b>{ownershipBadgeLabel(ownership)}</b>
-                                </button>
-                            )
-                          })}
-                        </div>
-                    ) : systemIsCore ? (
-                        <div className="core-warning-card">
-                          <span>NO STABLE PLANETARY ORBITS REGISTERED</span>
-                          <strong>Relativistic exclusion zone</strong>
-                          <p>The accretion flow and core dynamics are rendered from backend parameters. No gameplay simulation is performed by the frontend.</p>
-                        </div>
-                    ) : null}
-                    {!systemIsCore && (
-                        <section className="spacecraft-launcher spacecraft-launcher--system">
-                          <span>LOCAL FLIGHT PROTOTYPE</span>
-                          <strong>{activeSpacecraftPlan ? activeSpacecraftPlan.name : 'Launch from a planet'}</strong>
-                          <p>
-                            {activeSpacecraftPlan
-                              ? `Origin: ${activeSpacecraftPlan.launchPlanetName ?? 'local system orbit'}. Drag the six maneuver arrows directly in the system view.`
-                              : 'Open a planet and use its launch control. The spacecraft will inherit that world’s current orbital position before you plan a maneuver.'}
-                          </p>
-                        </section>
-                    )}
-                  </>
-              )}
-
-              {view.type === 'planet' && planet && (
+                <strong>
+                  {systemIsCore
+                    ? "Supermassive central singularity"
+                    : systemOwnership?.relation === "self"
+                      ? "Your system"
+                      : systemOwnership?.relation === "other"
+                        ? systemOwnership.playerName
+                        : "Outside every registered territory"}
+                </strong>
+                <small>
+                  {systemIsCore
+                    ? "A backend-defined galactic landmark. It is selectable like a system, but is not colonizable."
+                    : systemOwnership?.relation === "self"
+                      ? `Owned by ${currentPlayer.name}. This system contributes influence to your territorial field.`
+                      : systemOwnership?.relation === "other"
+                        ? `${relationshipDescription(systemOwnership)} This system contributes influence to ${systemOwnership.playerName ?? "that player"}’s territorial field.`
+                        : `${system.planets.filter((candidate) => !candidate.colonized).length} uncolonized world available for survey.`}
+                </small>
+              </div>
+              <dl className="fact-grid">
+                <div>
+                  <dt>Owner</dt>
+                  <dd>
+                    {systemIsCore
+                      ? "Core registry"
+                      : systemOwnership?.relation === "self"
+                        ? "You"
+                        : systemOwnership?.relation === "other"
+                          ? systemOwnership.playerName
+                          : "Unclaimed"}
+                  </dd>
+                </div>
+                <div>
+                  <dt>Relation</dt>
+                  <dd>
+                    {systemIsCore
+                      ? "Independent registry"
+                      : playerRelationLabel(systemOwnership)}
+                  </dd>
+                </div>
+                <div>
+                  <dt>Authority</dt>
+                  <dd>
+                    {systemIsCore
+                      ? "Core registry"
+                      : systemColonized
+                        ? system.faction
+                        : "None"}
+                  </dd>
+                </div>
+                <div>
+                  <dt>Worlds</dt>
+                  <dd>{system.planets.length}</dd>
+                </div>
+                <div>
+                  <dt>Primary</dt>
+                  <dd>{isBlackHoleSystem(system) ? "Black hole" : "Star"}</dd>
+                </div>
+                <div>
+                  <dt>Primary mass</dt>
+                  <dd>
+                    {formatSolarMass(systemInfluence?.primaryMassSolar ?? 1)} M☉
+                  </dd>
+                </div>
+                <div>
+                  <dt>Influence range</dt>
+                  <dd>
+                    {(systemInfluence?.influenceRadius ?? 38).toFixed(1)} map
+                    units
+                  </dd>
+                </div>
+                <div>
+                  <dt>Influence strength</dt>
+                  <dd>
+                    {(systemInfluence?.influenceStrength ?? 0.54).toFixed(2)}
+                  </dd>
+                </div>
+                {isBlackHoleSystem(system) && system.blackHole && (
                   <>
-                    <div className="panel-heading">
-                      <span>{planet.type}</span>
-                      <strong>{temperatureExtent(planet.temperature)}</strong>
+                    <div>
+                      <dt>Spin</dt>
+                      <dd>{system.blackHole.spin.toFixed(2)}</dd>
                     </div>
-                    <p className="panel-copy">{planet.description}</p>
-                    <dl className="fact-grid">
-                      <div><dt>Gravity</dt><dd>{planet.gravity} g</dd></div>
-                      <div><dt>Atmosphere</dt><dd>{planet.atmosphere}</dd></div>
-                      {planet.landFraction !== undefined && (
-                          <div><dt>Exposed land</dt><dd>{(Math.min(0.07, Math.max(0, planet.landFraction)) * 100).toFixed(1)}%</dd></div>
-                      )}
-                      <div><dt>Pole → equator</dt><dd>{formatTemperature(planet.temperature.pole)} → {formatTemperature(planet.temperature.equator)}</dd></div>
-                      <div><dt>Sunward → darkside</dt><dd>{formatTemperature(planet.temperature.substellar)} → {formatTemperature(planet.temperature.antistellar)}</dd></div>
-                      <div><dt>Discoverer</dt><dd>{planet.discoveredBy}</dd></div>
-                      <div><dt>Population</dt><dd>{new Intl.NumberFormat('en', { notation: 'compact', maximumFractionDigits: 1 }).format(planet.population)}</dd></div>
-                      <div><dt>Owner</dt><dd>{planetOwnership?.relation === 'self' ? 'You' : planetOwnership?.relation === 'other' ? planetOwnership.playerName : 'Unclaimed'}</dd></div>
-                      <div><dt>Relation</dt><dd>{playerRelationLabel(planetOwnership)}</dd></div>
-                      <div><dt>Moons</dt><dd>{planet.moons?.length ?? 0}</dd></div>
-                      <div><dt>Sites</dt><dd>{planet.surfacePoints.length}</dd></div>
-                      <div><dt>Seed</dt><dd>{planetSeedKey ?? 'pending'}</dd></div>
-                    </dl>
-                    <div className={`colonization-state relationship-card relationship-card--${planetOwnershipTone}`}>
-                      <span>{planetOwnership ? planetOwnershipLabel(planetOwnership) : 'UNCLAIMED WORLD'}</span>
-                      <strong>
-                        {planetOwnership?.relation === 'self'
-                            ? `${formatProduction(planet.population)} residents · Your world`
-                            : planetOwnership?.relation === 'other'
-                                ? `${planetOwnership.playerName} · ${formatProduction(planet.population)} residents`
-                                : 'No permanent population'}
-                      </strong>
-                      {planetOwnership && <small>{relationshipDescription(planetOwnership)}</small>}
-                    </div>
-
-                    {planet.colonized && planet.production && (
-                        <section className="production-panel">
-                          <div className="production-panel__heading">
-                            <span>PLANETARY OUTPUT</span>
-                            <small>per {planet.production.cycle} · {planet.production.unit}</small>
-                          </div>
-                          <div className="production-grid">
-                            {productionPresentation.map((metric) => {
-                              const value = planet.production?.[metric.key]
-                              if (value === undefined) return null
-                              return (
-                                  <div key={metric.key} className={`production-metric production-metric--${metric.key}`}>
-                                    <i>{metric.icon}</i>
-                                    <span>{metric.label}</span>
-                                    <strong>{formatProduction(value)}</strong>
-                                    <small>{planet.production?.unit}/{planet.production?.cycle}</small>
-                                  </div>
-                              )
-                            })}
-                          </div>
-                        </section>
-                    )}
-
-                    {!planet.colonized && (
-                        <section className="colonize-card">
-                          <span>COLONIZATION CANDIDATE</span>
-                          <strong>Establish a permanent foothold</strong>
-                          <p>This mock action represents a backend reducer. It creates a pioneer settlement, initial population, starter production, and territorial influence.</p>
-                          <button onClick={beginColonization} disabled={colonizingPlanetId === planet.id}>
-                            {colonizingPlanetId === planet.id ? 'Colony pod inbound…' : 'Colonize planet'}
-                          </button>
-                          {colonizationError && <small>{colonizationError}</small>}
-                        </section>
-                    )}
-
-                    <section className="spacecraft-launcher spacecraft-launcher--planet">
-                      <span>LOCAL FLIGHT PROTOTYPE</span>
-                      <strong>Launch from {planet.name}</strong>
-                      <p>The test craft starts at this planet’s current position and orbital plane. Planning then continues in the star-system view with all six local Δv directions.</p>
-                      <button type="button" onClick={launchLocalSpacecraftFromPlanet}>
-                        {activeSpacecraftPlan?.launchPlanetId === planet.id ? 'Relaunch from this planet' : 'Launch local spacecraft'}
-                      </button>
-                    </section>
-
-                    {planet.moons && planet.moons.length > 0 && (
-                        <section className="moon-roster">
-                          <span>ORBITAL SATELLITES</span>
-                          <div>
-                            {planet.moons.map((moon) => (
-                                <small key={moon.id}>{moon.name} · {moon.type}</small>
-                            ))}
-                          </div>
-                        </section>
-                    )}
-                    <div className="resource-row">
-                      {planet.resources.map((resource) => <span key={resource}>{resource}</span>)}
-                    </div>
-                    <div className="surface-card">
-                      <span>{selectedPoint ? selectedPoint.kind : 'SURFACE INTELLIGENCE'}</span>
-                      <strong>{selectedPoint?.label ?? 'Select a cyan marker'}</strong>
-                      <p>{selectedPoint?.description ?? 'Terrain and urban clusters are deterministic. Population controls city coverage, while emissive networks remain visible on the night side.'}</p>
+                    <div>
+                      <dt>Accretion</dt>
+                      <dd>
+                        {system.blackHole.accretionDisk
+                          ? "Active disc"
+                          : "Quiescent"}
+                      </dd>
                     </div>
                   </>
+                )}
+              </dl>
+              {system.planets.length > 0 ? (
+                <div className="system-list">
+                  {system.planets.map((item) => {
+                    const ownership = resolvePlanetOwnership(
+                      item,
+                      system,
+                      currentPlayer,
+                    );
+                    const tone = ownershipTone(ownership);
+                    return (
+                      <button
+                        key={item.id}
+                        className={`relationship-card relationship-card--${tone}`}
+                        onClick={() => openPlanet(item.id)}
+                      >
+                        <span
+                          className="planet-swatch"
+                          style={{ background: item.color }}
+                        />
+                        <span>
+                          <strong>{item.name}</strong>
+                          <small>
+                            {item.type} · {planetOwnershipLabel(ownership)}
+                          </small>
+                        </span>
+                        <b>{ownershipBadgeLabel(ownership)}</b>
+                      </button>
+                    );
+                  })}
+                </div>
+              ) : systemIsCore ? (
+                <div className="core-warning-card">
+                  <span>NO STABLE PLANETARY ORBITS REGISTERED</span>
+                  <strong>Relativistic exclusion zone</strong>
+                  <p>
+                    The accretion flow and core dynamics are rendered from
+                    backend parameters. No gameplay simulation is performed by
+                    the frontend.
+                  </p>
+                </div>
+              ) : null}
+              {!systemIsCore && (
+                <section className="spacecraft-launcher spacecraft-launcher--system">
+                  <span>PATCHED-CONIC FLIGHT</span>
+                  <strong>
+                    {activeSpacecraftPlan
+                      ? activeSpacecraftPlan.name
+                      : "Start from a planetary surface"}
+                  </strong>
+                  <p>
+                    {activeSpacecraftPlan
+                      ? activeSpacecraftPlan.flightState === "landed"
+                        ? `${activeSpacecraftPlan.name} is still landed on ${activeSpacecraftPlan.launchPlanetName}. Open that planet to take off.`
+                        : activeSpacecraftPlan.flightState === "destroyed"
+                          ? `${activeSpacecraftPlan.name} was lost on impact with ${activeSpacecraftPlan.lastSurfaceImpact?.bodyName ?? activeSpacecraftPlan.primaryBodyName}. Prepare a replacement from an owned planet.`
+                          : `Current frame: ${activeSpacecraftPlan.primaryBodyName}. Influence boundaries automatically hand the trajectory to the star, a planet, or a moon.`
+                      : "Open a planet, prepare a spacecraft on its surface, then take off into a local planetary orbit. Maneuver nodes execute only when the craft reaches them."}
+                  </p>
+                </section>
               )}
-            </aside>
-        )}
+            </>
+          )}
 
-        <footer className="controls-hint glass-panel">
-          <span><i>Drag</i> {view.type === 'universe' || view.type === 'galaxy' ? 'orbit map' : 'orbit camera'}</span>
-          <span><i>Wheel</i> zoom</span>
-          <span><i>Click</i> inspect</span>
-        </footer>
-      </main>
-  )
+          {view.type === "planet" && planet && (
+            <>
+              <div className="panel-heading">
+                <span>{planet.type}</span>
+                <strong>{temperatureExtent(planet.temperature)}</strong>
+              </div>
+              <p className="panel-copy">{planet.description}</p>
+              <dl className="fact-grid">
+                <div>
+                  <dt>Gravity</dt>
+                  <dd>{planet.gravity} g</dd>
+                </div>
+                <div>
+                  <dt>Atmosphere</dt>
+                  <dd>{planet.atmosphere}</dd>
+                </div>
+                {planet.landFraction !== undefined && (
+                  <div>
+                    <dt>Exposed land</dt>
+                    <dd>
+                      {(
+                        Math.min(0.07, Math.max(0, planet.landFraction)) * 100
+                      ).toFixed(1)}
+                      %
+                    </dd>
+                  </div>
+                )}
+                <div>
+                  <dt>Pole → equator</dt>
+                  <dd>
+                    {formatTemperature(planet.temperature.pole)} →{" "}
+                    {formatTemperature(planet.temperature.equator)}
+                  </dd>
+                </div>
+                <div>
+                  <dt>Sunward → darkside</dt>
+                  <dd>
+                    {formatTemperature(planet.temperature.substellar)} →{" "}
+                    {formatTemperature(planet.temperature.antistellar)}
+                  </dd>
+                </div>
+                <div>
+                  <dt>Discoverer</dt>
+                  <dd>{planet.discoveredBy}</dd>
+                </div>
+                <div>
+                  <dt>Population</dt>
+                  <dd>
+                    {new Intl.NumberFormat("en", {
+                      notation: "compact",
+                      maximumFractionDigits: 1,
+                    }).format(planet.population)}
+                  </dd>
+                </div>
+                <div>
+                  <dt>Owner</dt>
+                  <dd>
+                    {planetOwnership?.relation === "self"
+                      ? "You"
+                      : planetOwnership?.relation === "other"
+                        ? planetOwnership.playerName
+                        : "Unclaimed"}
+                  </dd>
+                </div>
+                <div>
+                  <dt>Relation</dt>
+                  <dd>{playerRelationLabel(planetOwnership)}</dd>
+                </div>
+                <div>
+                  <dt>Moons</dt>
+                  <dd>{planet.moons?.length ?? 0}</dd>
+                </div>
+                <div>
+                  <dt>Flight influence</dt>
+                  <dd>
+                    {(system
+                      ? findFlightBody(system, planet.id)?.influenceRadius
+                      : undefined
+                    )?.toFixed(2) ?? "—"}{" "}
+                    u
+                  </dd>
+                </div>
+                <div>
+                  <dt>Sites</dt>
+                  <dd>{planet.surfacePoints.length}</dd>
+                </div>
+                <div>
+                  <dt>Seed</dt>
+                  <dd>{planetSeedKey ?? "pending"}</dd>
+                </div>
+              </dl>
+              <div
+                className={`colonization-state relationship-card relationship-card--${planetOwnershipTone}`}
+              >
+                <span>
+                  {planetOwnership
+                    ? planetOwnershipLabel(planetOwnership)
+                    : "UNCLAIMED WORLD"}
+                </span>
+                <strong>
+                  {planetOwnership?.relation === "self"
+                    ? `${formatProduction(planet.population)} residents · Your world`
+                    : planetOwnership?.relation === "other"
+                      ? `${planetOwnership.playerName} · ${formatProduction(planet.population)} residents`
+                      : "No permanent population"}
+                </strong>
+                {planetOwnership && (
+                  <small>{relationshipDescription(planetOwnership)}</small>
+                )}
+              </div>
+
+              {planet.colonized && planet.production && (
+                <section className="production-panel">
+                  <div className="production-panel__heading">
+                    <span>PLANETARY OUTPUT</span>
+                    <small>
+                      per {planet.production.cycle} · {planet.production.unit}
+                    </small>
+                  </div>
+                  <div className="production-grid">
+                    {productionPresentation.map((metric) => {
+                      const value = planet.production?.[metric.key];
+                      if (value === undefined) return null;
+                      return (
+                        <div
+                          key={metric.key}
+                          className={`production-metric production-metric--${metric.key}`}
+                        >
+                          <i>{metric.icon}</i>
+                          <span>{metric.label}</span>
+                          <strong>{formatProduction(value)}</strong>
+                          <small>
+                            {planet.production?.unit}/{planet.production?.cycle}
+                          </small>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </section>
+              )}
+
+              {!planet.colonized && (
+                <section className="colonize-card">
+                  <span>COLONIZATION CANDIDATE</span>
+                  <strong>Establish a permanent foothold</strong>
+                  <p>
+                    This mock action represents a backend reducer. It creates a
+                    pioneer settlement, initial population, starter production,
+                    and territorial influence.
+                  </p>
+                  <button
+                    onClick={beginColonization}
+                    disabled={colonizingPlanetId === planet.id}
+                  >
+                    {colonizingPlanetId === planet.id
+                      ? "Colony pod inbound…"
+                      : "Colonize planet"}
+                  </button>
+                  {colonizationError && <small>{colonizationError}</small>}
+                </section>
+              )}
+
+              <section className="spacecraft-launcher spacecraft-launcher--planet">
+                <span>LOCAL FLIGHT</span>
+                <strong>
+                  {!canLaunchFromPlanet
+                    ? "Launch access unavailable"
+                    : activeSpacecraftPlan?.launchPlanetId === planet.id
+                      ? activeSpacecraftPlan.flightState === "landed"
+                        ? `${activeSpacecraftPlan.name} is parked at ${activeSpacecraftPlan.launchSurface.label}`
+                        : activeSpacecraftPlan.flightState === "destroyed"
+                          ? `${activeSpacecraftPlan.name} was lost`
+                          : `${activeSpacecraftPlan.name} is in flight`
+                      : `Prepare a spacecraft on ${planet.name}`}
+                </strong>
+                <p>
+                  {!canLaunchFromPlanet
+                    ? "Spacecraft can only be prepared and launched from a colonized planet that belongs to you."
+                    : activeSpacecraftPlan?.launchPlanetId === planet.id &&
+                        activeSpacecraftPlan.flightState === "landed"
+                      ? "The craft is physically anchored to this planet’s rotating surface. Takeoff creates its first low planet-relative orbit; only then does maneuver planning begin."
+                      : activeSpacecraftPlan?.flightState === "destroyed"
+                        ? `The trajectory intersected ${activeSpacecraftPlan.lastSurfaceImpact?.bodyName ?? "a body"}. Surface impacts now end the prototype flight instead of allowing a through-body flyby.`
+                        : activeSpacecraftPlan?.launchPlanetId === planet.id
+                          ? `Current trajectory is calculated in the ${activeSpacecraftPlan.primaryBodyName} frame. Crossing a visible influence zone automatically changes the active primary.`
+                          : "Preparing the craft places it at an owned surface spaceport. It remains landed until you explicitly take off."}
+                </p>
+                {!canLaunchFromPlanet ? (
+                  <button type="button" disabled>
+                    Owned colony required
+                  </button>
+                ) : activeSpacecraftPlan?.launchPlanetId === planet.id &&
+                  activeSpacecraftPlan.flightState === "landed" ? (
+                  <button type="button" onClick={takeOffLocalSpacecraft}>
+                    Take off into low orbit
+                  </button>
+                ) : activeSpacecraftPlan?.launchPlanetId === planet.id ? (
+                  <button
+                    type="button"
+                    onClick={prepareLocalSpacecraftFromPlanet}
+                  >
+                    {activeSpacecraftPlan.flightState === "destroyed"
+                      ? "Prepare replacement spacecraft"
+                      : "Return prototype to surface"}
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={prepareLocalSpacecraftFromPlanet}
+                  >
+                    {activeSpacecraftPlan
+                      ? `Move prototype to ${planet.name}`
+                      : "Prepare surface spacecraft"}
+                  </button>
+                )}
+              </section>
+
+              {planet.moons && planet.moons.length > 0 && (
+                <section className="moon-roster">
+                  <span>ORBITAL SATELLITES</span>
+                  <div>
+                    {planet.moons.map((moon) => (
+                      <small key={moon.id}>
+                        {moon.name} · {moon.type} · SOI{" "}
+                        {(system
+                          ? findFlightBody(system, moon.id)?.influenceRadius
+                          : undefined
+                        )?.toFixed(2) ?? "—"}{" "}
+                        u
+                      </small>
+                    ))}
+                  </div>
+                </section>
+              )}
+              <div className="resource-row">
+                {planet.resources.map((resource) => (
+                  <span key={resource}>{resource}</span>
+                ))}
+              </div>
+              <div className="surface-card">
+                <span>
+                  {selectedPoint ? selectedPoint.kind : "SURFACE INTELLIGENCE"}
+                </span>
+                <strong>
+                  {selectedPoint?.label ?? "Select a cyan marker"}
+                </strong>
+                <p>
+                  {selectedPoint?.description ??
+                    "Terrain and urban clusters are deterministic. Population controls city coverage, while emissive networks remain visible on the night side."}
+                </p>
+              </div>
+            </>
+          )}
+        </aside>
+      )}
+
+      <footer className="controls-hint glass-panel">
+        <span>
+          <i>Drag</i>{" "}
+          {view.type === "universe" || view.type === "galaxy"
+            ? "orbit map"
+            : "orbit camera"}
+        </span>
+        <span>
+          <i>Wheel</i> zoom
+        </span>
+        <span>
+          <i>Click</i> inspect
+        </span>
+      </footer>
+    </main>
+  );
 }
